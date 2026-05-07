@@ -12,6 +12,7 @@ const strategyRoutes = require('./routes/strategy');
 const tradeRoutes = require('./routes/trade');
 const chatRoutes = require('./routes/chat');
 const settingsRoutes = require('./routes/settings');
+const onchainRoutes = require('./routes/onchain');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -37,6 +38,7 @@ app.use('/strategy', strategyRoutes);
 app.use('/trade', tradeRoutes);
 app.use('/chat', chatRoutes);
 app.use('/settings', settingsRoutes);
+app.use('/onchain', onchainRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

@@ -69,6 +69,47 @@ export const settingsAPI = {
   deleteApiKey: (provider: string) => api.delete(`/settings/api-key/${provider}`),
 };
 
+// Onchain (DefiLlama public + Moralis per-user)
+export const onchainAPI = {
+  // Moralis key management
+  connectMoralis: (apiKey: string) => api.post('/onchain/moralis/connect', { apiKey }),
+  moralisStatus: () => api.get('/onchain/moralis/status'),
+  disconnectMoralis: () => api.delete('/onchain/moralis'),
+
+  // Macro pulse for the dashboard
+  pulse: () => api.get('/onchain/pulse'),
+
+  // DefiLlama
+  protocolTvl: (slug: string) => api.get(`/onchain/defillama/protocol/${slug}`),
+  chainTvl: (chain: string) => api.get(`/onchain/defillama/chain/${chain}`),
+  topProtocols: (params?: { chain?: string; category?: string; limit?: number }) =>
+    api.get('/onchain/defillama/protocols', { params }),
+  tokenPrices: (coins: string[]) => api.post('/onchain/defillama/prices', { coins }),
+  dexVolume: (chain: string) => api.get(`/onchain/defillama/dex/${chain}`),
+  perpsVolume: (chain = 'all') => api.get('/onchain/defillama/perps', { params: { chain } }),
+  stablecoinFlows: () => api.get('/onchain/defillama/stablecoins'),
+  stablecoinChainFlows: (chain: string) => api.get(`/onchain/defillama/stablecoins/${chain}`),
+  topYields: (params?: { chain?: string; project?: string; symbol?: string; minTvl?: number; limit?: number }) =>
+    api.get('/onchain/defillama/yields', { params }),
+
+  // Moralis (require connected key)
+  tokenPrice: (chain: string, address: string) => api.get(`/onchain/moralis/price/${chain}/${address}`),
+  tokenMetadata: (chain: string, address: string) => api.get(`/onchain/moralis/metadata/${chain}/${address}`),
+  tokenHolders: (chain: string, address: string, limit = 25) =>
+    api.get(`/onchain/moralis/holders/${chain}/${address}`, { params: { limit } }),
+  walletTokens: (chain: string, address: string) => api.get(`/onchain/moralis/wallet/${chain}/${address}/tokens`),
+  walletPnl: (chain: string, address: string, days: string = 'all') =>
+    api.get(`/onchain/moralis/wallet/${chain}/${address}/pnl`, { params: { days } }),
+  walletSwaps: (chain: string, address: string, limit = 25) =>
+    api.get(`/onchain/moralis/wallet/${chain}/${address}/swaps`, { params: { limit } }),
+  tokenTransfers: (chain: string, address: string, limit = 25) =>
+    api.get(`/onchain/moralis/transfers/${chain}/${address}`, { params: { limit } }),
+  topGainers: (params?: { chain?: string; timeFrame?: string; minMarketCap?: number; limit?: number }) =>
+    api.get('/onchain/moralis/top-gainers', { params }),
+  trending: (params?: { chain?: string; limit?: number }) =>
+    api.get('/onchain/moralis/trending', { params }),
+};
+
 // SSE streaming chat
 export function streamChat(message: string, token: string, onChunk: (data: any) => void): () => void {
   const controller = new AbortController();
