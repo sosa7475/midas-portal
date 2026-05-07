@@ -76,7 +76,7 @@ const DEFILLAMA_TOOLS = [
   },
   {
     name: 'defillama_perps_volume',
-    description: 'Get 24h/7d perp DEX volume across venues. Pass chain="all" for global, or specific chain (e.g. Arbitrum). Useful to spot perp-flow regime shifts.',
+    description: 'Perp DEX TVL ranks (capital deposited per venue: Jupiter, Hyperliquid, GMX, dYdX, etc.) plus TVL-weighted 1d/7d/30d change. Pass chain="all" for global or specific chain (e.g. Arbitrum, Solana). Useful to spot perp regime shifts. NOTE: returns TVL not 24h volume (volume endpoint is paid).',
     input_schema: {
       type: 'object',
       properties: { chain: { type: 'string', default: 'all' } },

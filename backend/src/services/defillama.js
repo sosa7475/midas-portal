@@ -136,20 +136,32 @@ async function getDexVolume(chain) {
 }
 
 async function getPerpsVolume(chain = 'all') {
-  const path = chain === 'all'
-    ? `${BASE}/overview/derivatives?excludeTotalDataChartBreakdown=true`
-    : `${BASE}/overview/derivatives/${encodeURIComponent(chain)}?excludeTotalDataChartBreakdown=true`;
-  const d = await get(path);
+  // /overview/derivatives is now Pro-gated. Free path: filter /protocols by
+  // category=Derivatives. Returns perp DEX *TVL* (capital deposited) + 1d/7d/30d
+  // TVL change — a useful regime signal even though it isn't 24h volume.
+  const all = await get(`${BASE}/protocols`);
+  let perps = (all || []).filter((p) => (p.category || '').toLowerCase() === 'derivatives');
+  if (chain && chain !== 'all') {
+    perps = perps.filter((p) => (p.chains || []).map((c) => c.toLowerCase()).includes(chain.toLowerCase()));
+  }
+  perps.sort((a, b) => (b.tvl || 0) - (a.tvl || 0));
+  const totalTvl = perps.reduce((s, p) => s + (p.tvl || 0), 0);
+  const weighted = (key) => {
+    const num = perps.reduce((s, p) => s + (p.tvl || 0) * (p[key] || 0), 0);
+    return totalTvl > 0 ? num / totalTvl : null;
+  };
   return {
     chain,
-    total24h: d.total24h,
-    total7d: d.total7d,
-    change24h: d.change_1d,
-    change7d: d.change_7d,
-    topVenues: (d.protocols || []).slice(0, 15).map((p) => ({
+    metric: 'tvl', // distinguishes from volume; agent should be aware
+    totalTvlUsd: totalTvl,
+    change24h: weighted('change_1d'),
+    change7d: weighted('change_7d'),
+    change30d: weighted('change_1m'),
+    topVenues: perps.slice(0, 15).map((p) => ({
       name: p.name,
-      total24h: p.total24h,
+      tvlUsd: p.tvl,
       change24h: p.change_1d,
+      change7d: p.change_7d,
       chains: p.chains,
     })),
   };
