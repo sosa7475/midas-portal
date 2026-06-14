@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { v4 as uuidv4 } from 'uuid';
+import { genId } from '../../src/utils/id';
 import { useStore } from '../../src/store';
 import { chatAPI, strategyAPI, tradeAPI, streamChat } from '../../src/services/api';
 import TradeCard from '../../src/components/TradeCard';
@@ -42,14 +42,14 @@ export default function ChatScreen() {
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isTyping) return;
-    const userMsg = { id: uuidv4(), role: 'user' as const, content: text.trim(), createdAt: new Date().toISOString() };
+    const userMsg = { id: genId(), role: 'user' as const, content: text.trim(), createdAt: new Date().toISOString() };
     addMessage(userMsg);
     setInput('');
     setTyping(true);
 
     let assistantContent = '';
     let tradeRec: any = null;
-    const assistantId = uuidv4();
+    const assistantId = genId();
 
     addMessage({ id: assistantId, role: 'assistant', content: '...', createdAt: new Date().toISOString() });
 
@@ -80,7 +80,7 @@ export default function ChatScreen() {
     if (result.canceled) return;
 
     const asset = result.assets[0];
-    const userMsg = { id: uuidv4(), role: 'user' as const, content: '📸 Chart uploaded for analysis', createdAt: new Date().toISOString() };
+    const userMsg = { id: genId(), role: 'user' as const, content: '📸 Chart uploaded for analysis', createdAt: new Date().toISOString() };
     addMessage(userMsg);
     setTyping(true);
 
@@ -92,7 +92,7 @@ export default function ChatScreen() {
       const res = await strategyAPI.analyzeScreenshot(formData);
       const { content, tradeRecommendation } = res.data;
 
-      addMessage({ id: uuidv4(), role: 'assistant', content, tradeRecommendation: tradeRecommendation || null, createdAt: new Date().toISOString() });
+      addMessage({ id: genId(), role: 'assistant', content, tradeRecommendation: tradeRecommendation || null, createdAt: new Date().toISOString() });
       if (tradeRecommendation) setPendingTrade(tradeRecommendation);
       setInput('');
     } catch (err: any) {
@@ -116,7 +116,7 @@ export default function ChatScreen() {
       });
       setPendingTrade(null);
       const confirmMsg = `Trade executed! Order ID: ${res.data.execution.orderId}\nStatus: ${res.data.execution.status}`;
-      addMessage({ id: uuidv4(), role: 'assistant', content: confirmMsg, createdAt: new Date().toISOString() });
+      addMessage({ id: genId(), role: 'assistant', content: confirmMsg, createdAt: new Date().toISOString() });
       useStore.getState().addTrade(res.data.trade);
     } catch (err: any) {
       Alert.alert('Trade Failed', err.response?.data?.error || 'Execution failed');

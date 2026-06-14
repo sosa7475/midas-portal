@@ -27,9 +27,11 @@ interface TradeRecommendation {
 interface Strategy {
   id: string;
   name: string;
-  rulesText: string;
-  parsedRulesJson?: object | null;
-  createdAt: string;
+  // Backend returns snake_case directly from Postgres rows.
+  rules_text: string;
+  parsed_rules_json?: object | null;
+  created_at: string;
+  createdAt?: string;
 }
 
 interface Trade {

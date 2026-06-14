@@ -85,7 +85,7 @@ export default function StrategyScreen() {
                   <Text style={[styles.stratName, { color: theme.text }]}>{strategy.name}</Text>
                 </View>
                 <Text style={[styles.stratDate, { color: theme.textMuted }]}>
-                  Active since {new Date(strategy.created_at || strategy.createdAt).toLocaleDateString()}
+                  Active since {new Date(strategy.created_at || strategy.createdAt || Date.now()).toLocaleDateString()}
                 </Text>
               </View>
               <Text style={[styles.stratText, { color: theme.textSecondary }]}>{strategy.rules_text || rulesText}</Text>

@@ -1,7 +1,6 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const { authenticate } = require('../middleware/auth');
 const { query } = require('../db/client');
 const { processMessage, invalidateStrategyCache } = require('../agents/session-manager');
@@ -11,7 +10,9 @@ const router = express.Router();
 router.use(authenticate);
 
 const upload = multer({
-  dest: process.env.UPLOAD_DIR || './uploads',
+  // In-memory storage: no disk writes (required for read-only serverless
+  // filesystems like Vercel). The image is read straight from req.file.buffer.
+  storage: multer.memoryStorage(),
   limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760') },
   fileFilter: (req, file, cb) => {
     const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
@@ -92,8 +93,7 @@ router.post('/analyze-screenshot', upload.single('screenshot'), async (req, res)
   const { notes } = req.body;
 
   try {
-    const imageBuffer = fs.readFileSync(req.file.path);
-    const imageBase64 = imageBuffer.toString('base64');
+    const imageBase64 = req.file.buffer.toString('base64');
     const imageMimeType = req.file.mimetype || 'image/png';
 
     const userMessage = notes
@@ -107,13 +107,9 @@ router.post('/analyze-screenshot', upload.single('screenshot'), async (req, res)
       imageMimeType,
     });
 
-    // Clean up temp file
-    fs.unlinkSync(req.file.path);
-
     res.json(result);
   } catch (err) {
     console.error('Screenshot analysis error:', err);
-    if (req.file?.path) fs.unlinkSync(req.file.path).catch(() => {});
     res.status(500).json({ error: 'Failed to analyze screenshot' });
   }
 });
