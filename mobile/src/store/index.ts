@@ -38,14 +38,16 @@ interface Trade {
   id: string;
   pair: string;
   side: 'long' | 'short';
-  size: number;
-  entryPrice?: number;
-  stopLoss?: number;
-  takeProfit?: number;
-  orderId?: string;
+  // Backend returns snake_case columns; DECIMAL fields arrive as strings.
+  size: number | string;
+  entry_price?: number | string;
+  stop_loss?: number | string;
+  take_profit?: number | string;
+  order_id?: string;
   status: string;
-  pnl?: number;
-  createdAt: string;
+  pnl?: number | string | null;
+  created_at: string;
+  createdAt?: string;
 }
 
 interface WalletBalance {

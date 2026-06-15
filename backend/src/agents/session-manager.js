@@ -136,10 +136,10 @@ function extractTradeRecommendation(text) {
   return {
     pair: pairs[1],
     side: side[1].toLowerCase(),
-    entry: entry ? parseFloat(entry[1].replace(',', '')) : null,
-    size: size ? parseFloat(size[1].replace(',', '')) : null,
-    stopLoss: sl ? parseFloat(sl[1].replace(',', '')) : null,
-    takeProfit: tp ? parseFloat(tp[1].replace(',', '')) : null,
+    entry: entry ? parseFloat(entry[1].replace(/,/g, '')) : null,
+    size: size ? parseFloat(size[1].replace(/,/g, '')) : null,
+    stopLoss: sl ? parseFloat(sl[1].replace(/,/g, '')) : null,
+    takeProfit: tp ? parseFloat(tp[1].replace(/,/g, '')) : null,
   };
 }
 

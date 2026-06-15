@@ -69,8 +69,17 @@ export const settingsAPI = {
   deleteApiKey: (provider: string) => api.delete(`/settings/api-key/${provider}`),
 };
 
-// SSE streaming chat
-export function streamChat(message: string, token: string, onChunk: (data: any) => void): () => void {
+// Chat over SSE. NOTE: React Native's fetch does not support streaming response
+// bodies (`res.body.getReader()` is undefined), so we read the full response
+// text and parse the SSE `data:` lines. The backend emits the reply in a single
+// event then `[DONE]`, so there's no token-by-token streaming to lose here.
+// `onDone` always fires once (success or error) so callers can clear UI state.
+export function streamChat(
+  message: string,
+  token: string,
+  onChunk: (data: any) => void,
+  onDone?: () => void
+): () => void {
   const controller = new AbortController();
 
   fetch(`${API_BASE}/chat/message`, {
@@ -83,24 +92,18 @@ export function streamChat(message: string, token: string, onChunk: (data: any) 
     signal: controller.signal,
   })
     .then(async (res) => {
-      const reader = res.body?.getReader();
-      if (!reader) return;
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter((l) => l.startsWith('data: '));
-        for (const line of lines) {
-          const data = line.slice(6);
-          if (data === '[DONE]') return;
-          try { onChunk(JSON.parse(data)); } catch {}
-        }
+      const text = await res.text();
+      const lines = text.split('\n').filter((l) => l.startsWith('data: '));
+      for (const line of lines) {
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') break;
+        try { onChunk(JSON.parse(data)); } catch {}
       }
     })
     .catch((err) => {
       if (err.name !== 'AbortError') console.error('Stream error:', err);
-    });
+    })
+    .finally(() => { onDone?.(); });
 
   return () => controller.abort();
 }

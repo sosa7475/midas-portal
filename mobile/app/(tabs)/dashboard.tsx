@@ -28,9 +28,11 @@ export default function DashboardScreen() {
   }
 
   const recentTrades = trades.slice(0, 5);
-  const totalPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
-  const winRate = trades.length > 0
-    ? Math.round((trades.filter((t) => (t.pnl || 0) > 0).length / trades.filter((t) => t.pnl != null).length) * 100)
+  // Postgres returns DECIMAL columns (incl. pnl) as strings, so coerce with Number().
+  const pnlTrades = trades.filter((t) => t.pnl != null);
+  const totalPnl = pnlTrades.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+  const winRate = pnlTrades.length > 0
+    ? Math.round((pnlTrades.filter((t) => Number(t.pnl) > 0).length / pnlTrades.length) * 100)
     : null;
 
   return (
@@ -97,7 +99,7 @@ export default function DashboardScreen() {
             <GlassCard key={trade.id} style={styles.tradeRow}>
               <View style={styles.tradeLeft}>
                 <Text style={[styles.tradePair, { color: theme.text }]}>{trade.pair}</Text>
-                <Text style={[styles.tradeDate, { color: theme.textMuted }]}>{new Date(trade.createdAt).toLocaleDateString()}</Text>
+                <Text style={[styles.tradeDate, { color: theme.textMuted }]}>{new Date(trade.created_at || trade.createdAt || Date.now()).toLocaleDateString()}</Text>
               </View>
               <View style={styles.tradeRight}>
                 <View style={[styles.sideTag, { backgroundColor: trade.side === 'long' ? Colors.profit + '22' : Colors.loss + '22' }]}>
@@ -106,8 +108,8 @@ export default function DashboardScreen() {
                   </Text>
                 </View>
                 {trade.pnl != null && (
-                  <Text style={{ color: trade.pnl >= 0 ? Colors.profit : Colors.loss, fontWeight: Typography.weights.semibold, marginTop: 2 }}>
-                    {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
+                  <Text style={{ color: Number(trade.pnl) >= 0 ? Colors.profit : Colors.loss, fontWeight: Typography.weights.semibold, marginTop: 2 }}>
+                    {Number(trade.pnl) >= 0 ? '+' : ''}${Number(trade.pnl).toFixed(2)}
                   </Text>
                 )}
               </View>

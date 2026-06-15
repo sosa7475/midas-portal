@@ -53,19 +53,31 @@ export default function ChatScreen() {
 
     addMessage({ id: assistantId, role: 'assistant', content: '...', createdAt: new Date().toISOString() });
 
-    const cancel = streamChat(text.trim(), token!, (data) => {
-      if (data.type === 'message') {
-        assistantContent = data.content;
-        tradeRec = data.tradeRecommendation || null;
-        setMessages(
-          useStore.getState().messages.map((m) =>
-            m.id === assistantId ? { ...m, content: assistantContent, tradeRecommendation: tradeRec } : m
-          )
-        );
-        if (tradeRec) setPendingTrade(tradeRec);
+    const cancel = streamChat(
+      text.trim(),
+      token!,
+      (data) => {
+        if (data.type === 'message') {
+          assistantContent = data.content;
+          tradeRec = data.tradeRecommendation || null;
+          setMessages(
+            useStore.getState().messages.map((m) =>
+              m.id === assistantId ? { ...m, content: assistantContent, tradeRecommendation: tradeRec } : m
+            )
+          );
+          if (tradeRec) setPendingTrade(tradeRec);
+        }
+      },
+      () => {
+        // If the reply never arrived, drop the placeholder "..." bubble.
+        if (!assistantContent) {
+          setMessages(useStore.getState().messages.filter((m) => m.id !== assistantId));
+        }
+        setTyping(false);
       }
-    });
+    );
 
+    // Safety net: abort and clear typing if the request hangs past the timeout.
     setTimeout(() => {
       setTyping(false);
       cancel();

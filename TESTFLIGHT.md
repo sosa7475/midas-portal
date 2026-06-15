@@ -40,6 +40,12 @@ Variables) — see `backend/.env.example` for the full list:
 
 Verify: open `https://<name>.vercel.app/health` → should return `{"status":"ok"}`.
 
+> **Timeout note:** chat + chart-vision calls can take >10s. `vercel.json` sets
+> `maxDuration: 60`, but Vercel's **Hobby** plan hard-caps functions at 10s
+> (you may see 504s on slow LLM replies). Use the **Pro** plan, or host the
+> backend somewhere without a short timeout (Render/Railway/Fly), to get the
+> full 60s.
+
 > Run the DB migration once: `DATABASE_URL=... npm run db:migrate` (from `backend/`).
 
 ## 2. Point the app at the deployed backend

@@ -12,12 +12,12 @@ async function createOpenAIClient(apiKey) {
   return new OpenAI({ apiKey: apiKey || process.env.OPENAI_API_KEY });
 }
 
-async function chatOpenAI({ messages, tools, apiKey, stream = false, imageBase64 = null, imageMimeType = null }) {
+async function chatOpenAI({ messages, tools, apiKey, stream = false, imageBase64 = null, imageMimeType = null, systemPrompt = null }) {
   const client = await createOpenAIClient(apiKey);
   const model = process.env.OPENAI_MODEL || 'gpt-4o';
 
-  const formattedMessages = messages.map((m) => {
-    if (m.role === 'user' && imageBase64 && messages.indexOf(m) === messages.length - 1) {
+  const formattedMessages = messages.map((m, i) => {
+    if (m.role === 'user' && imageBase64 && i === messages.length - 1) {
       return {
         role: 'user',
         content: [
@@ -31,6 +31,13 @@ async function chatOpenAI({ messages, tools, apiKey, stream = false, imageBase64
     }
     return { role: m.role, content: m.content };
   });
+
+  // Prepend the system prompt (Midas persona + the user's strategy). Without
+  // this, OpenAI receives no instructions and never emits the TRADE
+  // RECOMMENDATION format the app parses into trade cards.
+  if (systemPrompt) {
+    formattedMessages.unshift({ role: 'system', content: systemPrompt });
+  }
 
   const params = {
     model,
