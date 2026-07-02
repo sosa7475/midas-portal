@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS trades (
 CREATE TABLE IF NOT EXISTS api_keys (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  provider VARCHAR(50) NOT NULL,  -- 'orderly', 'anthropic', 'openai'
+  provider VARCHAR(50) NOT NULL,  -- 'orderly', 'anthropic', 'openai', 'moralis'
   encrypted_key TEXT NOT NULL,
   encrypted_secret TEXT,
   label VARCHAR(100),

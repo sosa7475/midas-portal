@@ -13,13 +13,13 @@
       "ios": { "simulator": false },
       "android": { "buildType": "apk" },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-DEPLOYED-BACKEND.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://midas-portal-api.vercel.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-DEPLOYED-BACKEND.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://midas-portal-api.vercel.app"
       }
     }
   },

@@ -34,7 +34,8 @@
           "photosPermission": "Allow Midas to access your photos for chart analysis.",
           "cameraPermission": "Allow Midas to use your camera to capture charts."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "scheme": "midasportal"
   }

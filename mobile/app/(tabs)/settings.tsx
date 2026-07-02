@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useStore } from '../../src/store';
-import { walletAPI, settingsAPI } from '../../src/services/api';
+import { walletAPI, settingsAPI, onchainAPI } from '../../src/services/api';
 import GlassCard from '../../src/components/GlassCard';
 import PrimaryButton from '../../src/components/PrimaryButton';
 import { Colors, Typography, Spacing, Radius } from '../../src/theme';
@@ -26,13 +26,51 @@ export default function SettingsScreen() {
   const [savingKey, setSavingKey] = useState(false);
   const [savedProviders, setSavedProviders] = useState<string[]>([]);
 
-  useEffect(() => { loadSavedKeys(); }, []);
+  const [moralisKey, setMoralisKey] = useState('');
+  const [moralisConnected, setMoralisConnected] = useState(false);
+  const [savingMoralis, setSavingMoralis] = useState(false);
+
+  useEffect(() => { loadSavedKeys(); loadMoralisStatus(); }, []);
 
   async function loadSavedKeys() {
     try {
       const res = await settingsAPI.getApiKeys();
       setSavedProviders(res.data.providers.map((p: any) => p.provider));
     } catch {}
+  }
+
+  async function loadMoralisStatus() {
+    try {
+      const res = await onchainAPI.moralisStatus();
+      setMoralisConnected(!!res.data.connected);
+    } catch {}
+  }
+
+  async function saveMoralisKey() {
+    if (!moralisKey.trim()) { Alert.alert('Error', 'Enter your Moralis API key.'); return; }
+    setSavingMoralis(true);
+    try {
+      await onchainAPI.connectMoralis(moralisKey.trim());
+      Alert.alert('Connected', 'Moralis key saved and verified.');
+      setMoralisKey('');
+      setMoralisConnected(true);
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.error || 'Failed to save Moralis key');
+    } finally {
+      setSavingMoralis(false);
+    }
+  }
+
+  async function disconnectMoralis() {
+    Alert.alert('Remove Moralis Key', 'Disconnect your Moralis API key?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove', style: 'destructive',
+        onPress: async () => {
+          try { await onchainAPI.disconnectMoralis(); setMoralisConnected(false); } catch {}
+        },
+      },
+    ]);
   }
 
   async function connectWallet() {
@@ -190,6 +228,41 @@ export default function SettingsScreen() {
               ))}
             </View>
           )}
+        </GlassCard>
+
+        {/* Onchain data */}
+        <SectionLabel title="Onchain Data" theme={theme} />
+        <GlassCard>
+          <Text style={[styles.sectionDesc, { color: theme.textSecondary }]}>
+            Connect your Moralis Web3 API key. The agent uses it for live token prices, holder concentration, wallet PnL, and smart-money signals across EVM chains + Solana. DefiLlama (TVL, DEX volumes, stablecoin flows) needs no key.
+          </Text>
+
+          {moralisConnected ? (
+            <View style={[styles.savedRow, { marginTop: Spacing.sm }]}>
+              <View style={[styles.savedBadge, { backgroundColor: Colors.primary + '22' }]}>
+                <Text style={[styles.savedBadgeText, { color: Colors.primary }]}>moralis · connected</Text>
+              </View>
+              <TouchableOpacity onPress={disconnectMoralis}>
+                <Ionicons name="trash-outline" size={18} color={Colors.loss} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.text, marginTop: Spacing.sm }]}
+            placeholder={moralisConnected ? 'Replace existing Moralis key' : 'Moralis API Key'}
+            placeholderTextColor={theme.textMuted}
+            value={moralisKey}
+            onChangeText={setMoralisKey}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+          <PrimaryButton
+            label={savingMoralis ? 'Verifying...' : moralisConnected ? 'Update Key' : 'Connect Moralis'}
+            onPress={saveMoralisKey}
+            loading={savingMoralis}
+            style={{ marginTop: Spacing.sm }}
+          />
         </GlassCard>
 
         {/* Sign out */}
