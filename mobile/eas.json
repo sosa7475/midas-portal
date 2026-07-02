@@ -7,10 +7,12 @@
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": { "buildType": "apk" },
+      "env": { "EXPO_PUBLIC_API_URL": "https://midas-portal-api.vercel.app" }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": { "EXPO_PUBLIC_API_URL": "https://midas-portal-api.vercel.app" }
     }
   },
   "submit": {
