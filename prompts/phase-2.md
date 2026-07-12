@@ -6,7 +6,7 @@
 Give the agent real market awareness. Build `packages/analysis` (data providers + indicators, exposed as MCP-shaped LLM tools) and `packages/agent` (a real agentic tool-use loop). No UI charts yet beyond what's needed to verify.
 
 ## Tasks
-- [ ] `packages/analysis` provider clients (normalized interface, Upstash cache, timeout/retry/rate-limit): Orderly public (candles, orderbook, funding, OI, mark/index), Crypto.com Exchange (ticker, candles, orderbook, trades), CoinDesk (indices/news), FMP (fundamentals/news).
+- [ ] `packages/analysis` provider clients (normalized interface, in-process/Postgres cache, timeout/retry/rate-limit): Orderly public (candles, orderbook, funding, OI, mark/index), Crypto.com Exchange (ticker, candles, orderbook, trades), CoinDesk (indices/news), FMP (fundamentals/news).
 - [ ] `compute_indicators`: RSI, MACD, EMA/SMA, ATR, VWAP, Bollinger, support/resistance from OHLCV.
 - [ ] Expose all as **MCP-shaped tool definitions** (name, description, JSON schema) — swapping a real MCP server later must require no change to `packages/agent`.
 - [ ] `packages/agent`: real tool-use loop — LLM may call tools, `apps/api` executes them, results feed back until a final answer. Wire `tools` through the LLM adapter (currently supported but never passed → dead path).

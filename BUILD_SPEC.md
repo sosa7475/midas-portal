@@ -18,7 +18,7 @@
 | Market analysis source | **Direct provider APIs, exposed as MCP-shaped LLM tools** | Backend calls Orderly public + Crypto.com / CoinDesk / FMP REST/WS directly. Tool schemas are MCP-compatible so real MCP servers can be swapped in later without changing the agent loop. |
 | Exchange | **Orderly Network (perps)** | Real ed25519 signing + account registration required (current HMAC impl is wrong). |
 | LLM | **Provider-agnostic (OpenAI / Anthropic)** via existing adapter | Keep BYO-key support; default provider via env. Prefer latest Claude models for the agent loop. |
-| Deployment | **Fly.io** (backend API — one long-lived Node service), **Vercel** (web UI + landing), **EAS/TestFlight** (mobile), **Neon** (Postgres), **Upstash** (Redis/rate-limit/cache), **S3 or Fly volume** (uploads) | One backend on Fly, shared by web and mobile. |
+| Deployment | **Fly.io** (backend API — one long-lived Node service), **Vercel** (web UI + landing), **EAS/TestFlight** (mobile), **Neon** (Postgres, also backs rate-limiting), **Fly volume** (uploads) | One backend on Fly, shared by web and mobile. |
 | Design language | **Glassmorphism + agentic web3 trading aesthetic** | Dark-first, translucent glass surfaces, subtle gradients/glow, motion, "agent is thinking/acting" transparency. Shared token system across web + mobile. |
 | Security | **Top priority, non-negotiable** | See §5. Every phase's DoD includes its security checks; nothing ships that fails them. |
 
@@ -27,7 +27,7 @@
 - **Frontend (`apps/web`) → Vercel.** Next.js App Router serves the marketing landing (public) and the authed app UI, calling `apps/api` over HTTPS. Vercel gives edge CDN + preview deploys for the frontend.
 - **Mobile (`apps/mobile`) → EAS build → TestFlight** (iOS) and Play internal track (Android), calling the same `apps/api`.
 - **CORS:** `apps/api` allows only the Vercel web origin(s) + the mobile app; no wildcard with credentials.
-- **State:** even though a long-lived server *could* keep sessions in memory, keep agent/session state in Postgres/Upstash so restarts and multi-machine scaling stay correct (see Phase 1).
+- **State:** even though a long-lived server *could* keep sessions in memory, keep agent/session state in Postgres so restarts and multi-machine scaling stay correct (see Phase 1).
 
 > Note: moving the backend off serverless resolves most of the "serverless-fatal" defects in §1 by construction (SSE, persistent WS, filesystem, cron). Phase 1 still hardens statefulness and uploads for **multi-instance** correctness, and fixes the non-hosting bugs (status enum, PnL, crypto, Orderly signing).
 
@@ -37,7 +37,7 @@ These must be supplied as env/secrets before the relevant phase can be verified:
 - Market-data API keys: Crypto.com Exchange, CoinDesk, FMP.
 - LLM keys (OpenAI and/or Anthropic).
 - **Fly.io** account + `flyctl` auth token, app name, and region; **Vercel** project for `apps/web`.
-- Neon `DATABASE_URL`, Upstash Redis URL/token, object storage (S3 bucket creds or a Fly volume) for uploads.
+- Neon `DATABASE_URL`; a Fly volume for uploads. (No Redis — rate-limiting is Postgres-backed.)
 - Apple Developer + Google Play accounts and an EAS `projectId` for TestFlight / Play submission.
 
 ---
@@ -56,10 +56,10 @@ These must be supplied as env/secrets before the relevant phase can be verified:
 
 ### Must-fix defects (see Phase 1)
 **Hosting-related (mostly resolved by moving to Fly — but still fix for multi-instance correctness; do NOT reintroduce serverless assumptions):**
-1. In-memory agent session store (`sessions = new Map()` in `session-manager.js`) — breaks across restarts and multiple Fly machines. Move to DB/Upstash.
+1. In-memory agent session store (`sessions = new Map()` in `session-manager.js`) — breaks across restarts and multiple Fly machines. Move to DB.
 2. Disk file uploads (`multer` disk storage + `fs` + `mkdirSync('./uploads')`) — not durable across machines/redeploys. Use S3/Fly volume.
 3. Fake SSE streaming in `routes/chat.js` — computes full response then writes once. On Fly, implement **real** token streaming.
-4. In-memory `express-rate-limit` store — per-machine only. Use the Upstash store so limits hold across machines.
+4. In-memory `express-rate-limit` store — per-machine only. Use a Postgres-backed store so limits hold across machines (no Redis).
 5. `app.listen()` is correct for Fly (long-lived) — just ensure clean shutdown handling.
 
 **Correctness:**
@@ -113,12 +113,12 @@ midas-portal/ (Turborepo)
 
 Tasks:
 - Scaffold Turborepo; move `backend/` into `apps/api` (keep Express); move `mobile/` to `apps/mobile`; scaffold `apps/web` (Next.js).
-- Add `apps/api/Dockerfile` + `fly.toml`; deploy to Fly with ≥1 always-on machine; wire Neon + Upstash + object storage; health check.
+- Add `apps/api/Dockerfile` + `fly.toml`; deploy to Fly with ≥1 always-on machine; wire Neon + a Fly upload volume; health check.
 - Create `packages/shared`: zod schemas + TS types for every API request/response + design tokens; a typed API client used by web and mobile.
 - Replace `schema.sql` blob with **versioned migrations** (`db/`); add `positions`, `fills`, `alerts`, `strategy_versions`, `risk_limits` tables (fleshed out in later phases; stub now).
-- Restart-safe agent: delete `sessions = new Map()`; load strategy + recent history from DB per request (optionally cache in Upstash keyed by userId with TTL) so any machine can serve any request.
+- Restart-safe agent: delete `sessions = new Map()`; load strategy + recent history from DB per request so any machine can serve any request.
 - File uploads: stream to **S3/Fly volume** via object-storage client; don't rely on ephemeral local disk for durable data.
-- Rate limiting: Upstash Redis store (shared across machines); strict limits on auth + order endpoints.
+- Rate limiting: Postgres-backed store (shared across machines, no Redis); strict limits on auth + order endpoints.
 - Fix status enum bug (map Orderly statuses → allowed set, or widen the CHECK).
 - Crypto: AES-256-**GCM**, required non-default `ENCRYPTION_KEY` (fail fast if missing/default).
 - Real SSE: `apps/api` streams token-by-token (native on Fly — no fake single-write).
@@ -136,7 +136,7 @@ Tasks:
 **Goal:** the agent can see the market. Real agentic tool-use loop grounded in live data.
 
 Tasks (`packages/analysis`):
-- Provider clients: Orderly public (candles, orderbook, funding, OI, mark/index), Crypto.com Exchange (ticker, candles, orderbook, trades), CoinDesk (indices/news), FMP (fundamentals/news). Each behind a normalized interface with caching (Upstash) + rate-limit handling.
+- Provider clients: Orderly public (candles, orderbook, funding, OI, mark/index), Crypto.com Exchange (ticker, candles, orderbook, trades), CoinDesk (indices/news), FMP (fundamentals/news). Each behind a normalized interface with caching (in-process TTL / Postgres) + rate-limit handling.
 - `compute_indicators`: RSI, MACD, EMA/SMA, ATR, VWAP, Bollinger, support/resistance, from OHLCV.
 - Expose all of the above as **MCP-shaped tool definitions** (name, description, JSON schema) — see table in the analysis package README.
 - `packages/agent`: implement the real **tool-use loop** — the LLM may call tools, backend executes them, results feed back until a final answer. Wire `tools` through `llm-adapter.chat` (currently the adapter supports tools but `session-manager` never passes any — dead path).
@@ -237,7 +237,7 @@ Security is the top requirement. No phase is "done" until its security checks pa
 - **Auth:** short-lived access JWT + rotating refresh tokens with server-side revocation; bcrypt (cost ≥ 12); email verification + password reset; optional TOTP 2FA; biometric app-lock on mobile.
 - **Transport/headers:** HTTPS only, strict CORS allowlist (no `*` with credentials), Helmet/CSP, HSTS.
 - **Input:** validate **every** request with zod; parameterized SQL only (already the case — keep it); size/type limits on uploads; reject unexpected fields.
-- **Abuse:** Upstash-backed rate limiting per-IP and per-user; stricter limits on auth + order endpoints; idempotency keys on order placement.
+- **Abuse:** Postgres-backed rate limiting per-IP and per-user; stricter limits on auth + order endpoints; idempotency keys on order placement.
 - **Trading-specific:** server-side risk engine is a hard gate (max size/leverage/daily-loss) that the client cannot bypass; all orders require explicit user confirmation; full audit log of every order + agent decision.
 - **Least privilege:** Orderly keys scoped to trading (no withdrawals) where possible; separate staging/prod secrets; principle-of-least-privilege DB role.
 - **Supply chain:** pinned deps, `pnpm audit`/Dependabot in CI, no untrusted postinstall.

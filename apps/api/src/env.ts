@@ -25,10 +25,6 @@ const EnvSchema = z.object({
 
   ALLOWED_ORIGINS: z.string().optional(), // comma-separated browser origins
 
-  // Upstash Redis (rate limiting / cache). Required in production.
-  UPSTASH_REDIS_REST_URL: isProd ? z.string().url() : z.string().url().optional(),
-  UPSTASH_REDIS_REST_TOKEN: isProd ? z.string().min(1) : z.string().min(1).optional(),
-
   // LLM
   ACTIVE_LLM_PROVIDER: z.enum(["openai", "anthropic"]).default("openai"),
   OPENAI_API_KEY: z.string().optional(),

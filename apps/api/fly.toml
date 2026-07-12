@@ -5,8 +5,8 @@
 #   fly apps create midas-portal-api
 #   fly volumes create midas_uploads --size 1 --region <region>
 #   fly secrets set DATABASE_URL=... JWT_SECRET=... ENCRYPTION_KEY=... \
-#     UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=... \
 #     OPENAI_API_KEY=... ALLOWED_ORIGINS=https://<web-domain>
+# (Rate limiting is Postgres-backed — no Redis secrets needed.)
 
 app = "midas-portal-api"
 primary_region = "iad"

@@ -13,8 +13,6 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@midas/shared": "workspace:*",
-    "@upstash/ratelimit": "^2.0.5",
-    "@upstash/redis": "^1.34.3",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "express": "^4.21.2",

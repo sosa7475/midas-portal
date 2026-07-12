@@ -10,10 +10,10 @@ Stand up the monorepo, migrate the existing backend/mobile in, ship the backend 
 - [ ] Migrate `backend/src/**` → `apps/api` (keep Express); migrate `mobile/**` → `apps/mobile`; scaffold `apps/web` (Next.js App Router, glass design shell).
 - [ ] `packages/shared`: zod schemas + inferred TS types for **every** API request/response; typed API client; design tokens (from `mobile/src/theme`). Web + mobile import these.
 - [ ] `db/`: versioned migrations replacing `schema.sql`; add stub tables `positions`, `fills`, `alerts`, `strategy_versions`, `risk_limits`.
-- [ ] `apps/api/Dockerfile` + `fly.toml`; deploy to Fly (≥1 always-on machine); wire Neon + Upstash + object storage; `/health` endpoint.
-- [ ] Restart-safe agent: remove `sessions = new Map()`; load strategy + history from DB per request (optional Upstash cache).
+- [ ] `apps/api/Dockerfile` + `fly.toml`; deploy to Fly (≥1 always-on machine); wire Neon + a Fly upload volume; `/health` endpoint.
+- [ ] Restart-safe agent: remove `sessions = new Map()`; load strategy + history from DB per request.
 - [ ] Uploads → S3/Fly volume (not ephemeral disk).
-- [ ] Rate limiting → Upstash store; strict on auth + order routes.
+- [ ] Rate limiting → Postgres-backed store (no Redis); strict on auth + order routes.
 - [ ] Fix status-enum bug (Orderly status → allowed set, or widen CHECK).
 - [ ] Crypto → AES-256-GCM; require non-default `ENCRYPTION_KEY` + `JWT_SECRET` (fail fast).
 - [ ] Real token-by-token SSE in `apps/api` chat route.

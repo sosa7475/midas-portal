@@ -5,7 +5,7 @@ You are building **Midas Portal**, an agentic web3 crypto perp-trading app: a Fl
 ## Before writing any code
 1. **Read `BUILD_SPEC.md` end to end**, then read `prompts/phase-1.md`.
 2. Read the current code so you migrate rather than rewrite: `backend/src/**` (the existing Express API) and `mobile/**` (the existing Expo app).
-3. Confirm which **external prerequisites** from BUILD_SPEC §0 you have (Fly token, Neon `DATABASE_URL`, Upstash, object storage, LLM keys, Orderly testnet broker/account + signing docs). If any needed for Phase 1 are missing, list exactly what you need and stop — do not fake them.
+3. Confirm which **external prerequisites** from BUILD_SPEC §0 you have (Fly token, Neon `DATABASE_URL`, LLM keys, Orderly testnet broker/account + signing docs). If any needed for Phase 1 are missing, list exactly what you need and stop — do not fake them.
 
 ## How to work
 - **Execute Phase 1 only** in this session (foundation, monorepo, Fly deploy, defect fixes). Do not start Phase 2+.

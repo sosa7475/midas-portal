@@ -8,7 +8,7 @@ import helmet from "helmet";
 import cors from "cors";
 import { env, IS_PROD } from "./env";
 import { pool } from "./db";
-import { rateLimit } from "./redis";
+import { rateLimit } from "./ratelimit";
 import { ensureUploadDir } from "./services/storage";
 
 import authRoutes from "./routes/auth";
@@ -44,7 +44,7 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limits: shared store (Upstash) so they hold across machines.
+// Rate limits: Postgres-backed so they hold across machines (no Redis).
 app.use(rateLimit({ tokens: 200, windowSec: 900, keyPrefix: "global" }));
 const authLimiter = rateLimit({ tokens: 20, windowSec: 900, keyPrefix: "auth" });
 const orderLimiter = rateLimit({ tokens: 30, windowSec: 900, keyPrefix: "order" });
@@ -74,6 +74,8 @@ app.use(
   }
 );
 
+export { app };
+
 async function main() {
   await ensureUploadDir();
   const server = app.listen(env.PORT, "0.0.0.0", () => {
@@ -94,7 +96,10 @@ async function main() {
   process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
-main().catch((err) => {
-  console.error("Fatal startup error:", err);
-  process.exit(1);
-});
+// Only start the listener when run directly (not when imported by a test).
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Fatal startup error:", err);
+    process.exit(1);
+  });
+}
