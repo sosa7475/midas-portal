@@ -1,0 +1,46 @@
+# Fly.io config for the Midas API.
+# Deploy from the repo root:
+#   fly deploy --config apps/api/fly.toml
+# First-time setup:
+#   fly apps create midas-portal-api
+#   fly volumes create midas_uploads --size 1 --region <region>
+#   fly secrets set DATABASE_URL=... JWT_SECRET=... ENCRYPTION_KEY=... \
+#     UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=... \
+#     OPENAI_API_KEY=... ALLOWED_ORIGINS=https://<web-domain>
+
+app = "midas-portal-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  release_command = "node dist/db/migrate.js"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  UPLOAD_DIR = "/data/uploads"
+  ORDERLY_BASE_URL = "https://testnet-api-evm.orderly.org"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = "off"    # long-lived: SSE + (Phase 3) persistent Orderly WS
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[mounts]
+  source = "midas_uploads"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
