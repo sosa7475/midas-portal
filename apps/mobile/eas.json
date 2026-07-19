@@ -3,14 +3,18 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": { "EXPO_PUBLIC_API_URL": "http://localhost:3001" }
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "ios": { "simulator": false },
+      "android": { "buildType": "apk" },
+      "env": { "EXPO_PUBLIC_API_URL": "https://midas-portal-api.fly.dev" }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": { "EXPO_PUBLIC_API_URL": "https://midas-portal-api.fly.dev" }
     }
   },
   "submit": {
