@@ -1,0 +1,38 @@
+# Fly config for the Midas MCP server (remote Streamable-HTTP transport).
+# Setup:
+#   fly apps create midas-mcp
+#   fly volumes create midas_mcp_data --size 1 --region iad --app midas-mcp
+#   fly secrets set --app midas-mcp MIDAS_MCP_TOKEN="$(openssl rand -hex 24)"
+#   fly deploy --config apps/mcp/fly.toml
+# Then add https://midas-mcp.fly.dev/mcp as a claude.ai custom connector (Bearer token).
+
+app = "midas-mcp"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  MIDAS_DATA_DIR = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    path = "/health"
+
+[mounts]
+  source = "midas_mcp_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
