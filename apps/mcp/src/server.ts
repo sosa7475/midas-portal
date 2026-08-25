@@ -12,7 +12,9 @@ import {
   normalizeSymbol,
   summarize,
 } from "@midas/analysis";
+import { checkTrade } from "@midas/exchange";
 import { getStrategy, setStrategy } from "./strategy-store.js";
+import { loadTrading } from "./orderly-creds.js";
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
 
@@ -27,10 +29,12 @@ export function createServer(): McpServer {
     { name: "midas-portal", version: "0.1.0" },
     {
       instructions:
-        "Midas provides live crypto perp market data, technical analysis, and the user's " +
-        "trading strategy. Use analyze_market before giving any trade opinion so your advice " +
-        "cites real numbers (price, RSI, ATR-based stops, funding). Check ideas against " +
-        "get_strategy. Never claim a trade was placed — execution is not yet enabled.",
+        "Midas provides live crypto perp market data, technical analysis, the user's trading " +
+        "strategy, and live Orderly execution. Always call analyze_market before a trade opinion " +
+        "so advice cites real numbers (price, RSI, ATR-based stops, funding). Check ideas against " +
+        "get_strategy. Before place_trade, confirm the parameters with the user in plain language; " +
+        "the risk engine may still block the order, and only report a trade as placed if the tool " +
+        "returns placed:true.",
     }
   );
 
@@ -131,29 +135,47 @@ export function createServer(): McpServer {
     async ({ rulesText, name }) => text(await setStrategy(rulesText, name))
   );
 
-  // --- Account / execution (guarded — Phase 3) ---
-  // Deliberately NOT wired to live order placement. Orderly private endpoints need
-  // ed25519 signing (Phase 3) and an explicit human-confirmation flow before any
-  // real order fires. These return a clear "not enabled" result so the agent never
-  // claims a trade happened.
+  // --- Account / execution (live Orderly via ed25519, risk + safety gated) ---
+  // Credentials come from env (onboarding CLI). Reads work whenever creds exist.
+  // Writes additionally require MIDAS_TRADING_ENABLED=true AND pass the risk engine;
+  // MCP clients also prompt the user to approve each call (the human confirmation).
+
+  const NOT_CONFIGURED = {
+    enabled: false,
+    reason:
+      "Orderly trading not configured. Run onboarding (`pnpm --filter @midas/mcp onboard`), " +
+      "set ORDERLY_ACCOUNT_ID / ORDERLY_KEY / ORDERLY_SECRET_HEX, and fund the account.",
+  };
 
   server.registerTool(
     "get_account",
     {
       title: "Get account (balance & positions)",
-      description:
-        "Live balance and open positions. NOT YET ENABLED — requires Orderly ed25519 account " +
-        "auth (Phase 3). Returns an explanatory status until then.",
+      description: "Live Orderly balance, free collateral, holdings, and open positions.",
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async () =>
-      text({
-        enabled: false,
-        reason:
-          "Live account access requires Orderly ed25519 signing + account registration (Phase 3). " +
-          "Analysis and strategy tools work now; balance/positions will light up after Phase 3.",
-      })
+    async () => {
+      const t = loadTrading();
+      if (!t) return text(NOT_CONFIGURED);
+      const [balance, positions] = await Promise.all([t.client.getBalance(), t.client.getPositions()]);
+      return text({ network: t.network, balance, positions });
+    }
+  );
+
+  server.registerTool(
+    "get_open_orders",
+    {
+      title: "Get open orders",
+      description: "Live open (incomplete) orders on Orderly.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async () => {
+      const t = loadTrading();
+      if (!t) return text(NOT_CONFIGURED);
+      return text({ network: t.network, orders: await t.client.getOrders("INCOMPLETE") });
+    }
   );
 
   server.registerTool(
@@ -161,28 +183,96 @@ export function createServer(): McpServer {
     {
       title: "Place trade",
       description:
-        "Place a perp order (pair, side, size, entry, SL, TP). NOT YET ENABLED — execution is " +
-        "gated behind Orderly ed25519 auth, a server-side risk engine, and explicit user " +
-        "confirmation (Phase 3). This tool will never place an order in its current state.",
+        "Place a perp order on Orderly. MARKET or LIMIT, optional stop-loss / take-profit " +
+        "(attached as reduce-only bracket orders). Passes the server-side risk engine first " +
+        "(max size/leverage/daily-loss/per-trade risk) and requires MIDAS_TRADING_ENABLED=true. " +
+        "Your MCP client will also ask you to approve this call.",
       inputSchema: {
-        pair: z.string(),
+        symbol: z.string().describe("e.g. PERP_BTC_USDC or BTC"),
         side: z.enum(["long", "short"]),
-        size: z.number().positive(),
-        entry: z.number().positive().optional(),
+        type: z.enum(["MARKET", "LIMIT"]).default("MARKET"),
+        quantity: z.number().positive().describe("base-asset quantity"),
+        price: z.number().positive().optional().describe("required for LIMIT"),
         stopLoss: z.number().positive().optional(),
         takeProfit: z.number().positive().optional(),
+        reduceOnly: z.boolean().optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
-    async (order) =>
-      text({
-        placed: false,
-        enabled: false,
-        reason:
-          "Trade execution is not enabled yet (Phase 3: Orderly ed25519 auth + risk engine + " +
-          "confirmation flow). Nothing was sent to any exchange.",
-        wouldHaveSubmitted: order,
-      })
+    async (o) => {
+      const t = loadTrading();
+      if (!t) return text(NOT_CONFIGURED);
+      if (!t.enabled) {
+        return text({
+          placed: false,
+          reason: "Trading is armed-off. Set MIDAS_TRADING_ENABLED=true to allow live orders.",
+        });
+      }
+      const symbol = normalizeSymbol(o.symbol);
+
+      // Price for risk math: LIMIT uses its price; MARKET uses live mark.
+      const refPrice = o.price ?? (await getSnapshot(symbol)).markPrice ?? 0;
+      const balance = await t.client.getBalance().catch(() => null);
+      const equity = Number(balance?.total_collateral_value) || 0;
+      const verdict = checkTrade(
+        {
+          notionalUsd: refPrice * o.quantity,
+          leverage: equity > 0 ? (refPrice * o.quantity) / equity : Infinity,
+          entry: refPrice,
+          stopLoss: o.stopLoss,
+          quantity: o.quantity,
+        },
+        { equityUsd: equity, realizedPnlTodayUsd: 0 },
+        t.limits
+      );
+      if (!verdict.ok) {
+        return text({ placed: false, blockedByRiskEngine: true, violations: verdict.violations });
+      }
+
+      const result = await t.client.placeOrder({
+        symbol,
+        side: o.side,
+        type: o.type,
+        quantity: o.quantity,
+        price: o.price,
+        reduceOnly: o.reduceOnly,
+        stopLoss: o.stopLoss,
+        takeProfit: o.takeProfit,
+      });
+      return text({ placed: true, network: t.network, order: result });
+    }
+  );
+
+  server.registerTool(
+    "cancel_order",
+    {
+      title: "Cancel order",
+      description: "Cancel a specific open order by id + symbol.",
+      inputSchema: { symbol: z.string(), orderId: z.number().int() },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    async ({ symbol, orderId }) => {
+      const t = loadTrading();
+      if (!t) return text(NOT_CONFIGURED);
+      if (!t.enabled) return text({ cancelled: false, reason: "Set MIDAS_TRADING_ENABLED=true." });
+      return text({ cancelled: true, result: await t.client.cancelOrder(normalizeSymbol(symbol), orderId) });
+    }
+  );
+
+  server.registerTool(
+    "close_position",
+    {
+      title: "Close position",
+      description: "Market-close the open position for a symbol (reduce-only).",
+      inputSchema: { symbol: z.string() },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    async ({ symbol }) => {
+      const t = loadTrading();
+      if (!t) return text(NOT_CONFIGURED);
+      if (!t.enabled) return text({ closed: false, reason: "Set MIDAS_TRADING_ENABLED=true." });
+      return text({ closed: true, result: await t.client.closePosition(normalizeSymbol(symbol)) });
+    }
   );
 
   return server;

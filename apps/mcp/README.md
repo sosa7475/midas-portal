@@ -14,10 +14,30 @@ Two transports, same tools:
 | `get_market_snapshot` | no | Price/funding/OI snapshot only |
 | `get_candles` | no | Raw OHLCV |
 | `get_strategy` / `set_strategy` | no | Read/save your strategy (local JSON) |
-| `get_account` | Phase 3 | Balance & positions — returns "not enabled" until Orderly ed25519 auth |
-| `place_trade` | Phase 3 | **Never fires yet** — gated behind ed25519 auth + risk engine + confirmation |
+| `get_account` | Orderly | Live balance, free collateral, holdings, open positions |
+| `get_open_orders` | Orderly | Live incomplete orders |
+| `place_trade` | Orderly + armed | MARKET/LIMIT + optional SL/TP bracket. Risk-engine gated; needs `MIDAS_TRADING_ENABLED=true` |
+| `cancel_order` / `close_position` | Orderly + armed | Cancel an order / market-close a position |
 
 Market data is live from Orderly's public endpoints — **no credentials required** for analysis.
+Trading uses real Orderly ed25519 auth (verified live on testnet).
+
+## Enable trading (Orderly)
+Orderly is non-custodial — an account is a wallet. Onboard once (creates a wallet + ed25519
+orderly-key, registers both, no gas):
+```
+pnpm --filter @midas/mcp build
+pnpm --filter @midas/mcp onboard            # testnet (default). MIDAS_NETWORK=mainnet for real funds.
+```
+It prints `ORDERLY_ACCOUNT_ID`, `ORDERLY_KEY`, `ORDERLY_SECRET_HEX`, and the wallet address/key
+(shown in your terminal only — never through the agent). Then:
+1. **Fund the wallet** with USDC collateral (testnet faucet, or real USDC on mainnet).
+2. Set the `ORDERLY_*` env vars on the MCP server (in your Claude Desktop/Code config `env` block).
+3. Set `MIDAS_TRADING_ENABLED=true` to arm live orders.
+
+**Safety layers before any order fires:** MCP client approval prompt → `MIDAS_TRADING_ENABLED` switch
+→ server-side risk engine (`MIDAS_MAX_POSITION_USD`, `MIDAS_MAX_LEVERAGE`, `MIDAS_MAX_DAILY_LOSS_USD`,
+`MIDAS_MAX_RISK_PCT`). A trade is only real if the tool returns `placed:true`.
 
 ## Build first
 ```
