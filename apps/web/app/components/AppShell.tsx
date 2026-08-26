@@ -71,8 +71,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="shell">
       <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 8px 14px" }}>
-          <Link href="/overview"><Logo collapsed={collapsed} /></Link>
+        <div className="side-top">
+          {!collapsed && <Link href="/overview" style={{ flex: 1 }}><Logo /></Link>}
+          <button className="side-collapse" onClick={toggleCollapsed} title={collapsed ? "Expand" : "Collapse"} aria-label="Toggle sidebar">
+            <Icon name="panel" size={18} />
+          </button>
         </div>
 
         <Link href="/agents/new" className="btn btn-solid" style={{ marginBottom: 8, justifyContent: collapsed ? "center" : "flex-start", padding: collapsed ? 0 : "0 14px" }}>
@@ -95,10 +98,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="side-item" onClick={async () => { await api.auth.logout(); router.push("/login"); }} title="Sign out">
           <Icon name="logout" size={19} />
           <span className="side-label">Sign out</span>
-        </div>
-        <div className="side-item" onClick={toggleCollapsed} title={collapsed ? "Expand" : "Collapse"}>
-          <Icon name="panel" size={19} />
-          <span className="side-label">Collapse</span>
         </div>
       </aside>
 
