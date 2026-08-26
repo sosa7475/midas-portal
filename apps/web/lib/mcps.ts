@@ -14,7 +14,7 @@ export const MCPS: McpDef[] = [
   {
     id: "technical-analysis",
     name: "Technical Analysis",
-    icon: "📈",
+    icon: "chart",
     category: "Market",
     description: "Live price, RSI, EMA, MACD, ATR, funding & open interest from Orderly market data.",
     ready: true,
@@ -23,7 +23,7 @@ export const MCPS: McpDef[] = [
   {
     id: "defillama",
     name: "DeFiLlama",
-    icon: "🦙",
+    icon: "layers",
     category: "DeFi",
     description: "Protocol TVL, yields/APYs, stablecoin flows, and chain-level DeFi metrics.",
     ready: true,
@@ -32,7 +32,7 @@ export const MCPS: McpDef[] = [
   {
     id: "moralis",
     name: "Moralis Money",
-    icon: "🔗",
+    icon: "link",
     category: "On-chain",
     description: "Wallet & token analytics, holder concentration, smart-money flows, transfers.",
     ready: false,
@@ -41,7 +41,7 @@ export const MCPS: McpDef[] = [
   {
     id: "orderly",
     name: "Orderly",
-    icon: "⚡",
+    icon: "bolt",
     category: "Execution",
     description: "Perp execution + your live account: balance, positions, PnL, Sharpe, win rate.",
     ready: false,

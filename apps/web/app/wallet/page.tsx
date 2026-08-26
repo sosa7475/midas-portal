@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "../../lib/useAuth";
+import { Icon } from "../components/Icon";
 
 export default function Wallet() {
   const ready = useAuth();
@@ -24,7 +25,7 @@ export default function Wallet() {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={{ fontSize: 26 }}>⚡</span>
+          <span style={{ width: 42, height: 42, borderRadius: 11, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand-ring)" }}><Icon name="bolt" size={20} /></span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 650 }}>Orderly Network</div>
             <div className="text-2" style={{ fontSize: 14 }}>

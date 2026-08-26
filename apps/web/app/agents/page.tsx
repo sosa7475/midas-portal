@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/useAuth";
 import { mcpById } from "../../lib/mcps";
+import { Icon } from "../components/Icon";
 
 export default function MyAgents() {
   const ready = useAuth();
@@ -30,7 +31,7 @@ export default function MyAgents() {
         <p className="muted">Loading…</p>
       ) : agents.length === 0 ? (
         <div className="card" style={{ textAlign: "center", padding: 48 }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🤖</div>
+          <div style={{ width: 52, height: 52, borderRadius: 14, margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand-ring)" }}><Icon name="agents" size={26} /></div>
           <h2 style={{ marginBottom: 8 }}>No agents yet</h2>
           <p className="text-2" style={{ marginBottom: 20 }}>Create your first trading agent — give it a strategy and connect its tools.</p>
           <Link href="/agents/new" className="btn btn-solid">Create an agent</Link>
@@ -50,7 +51,7 @@ export default function MyAgents() {
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
                 {(a.mcps ?? []).map((id: string) => (
-                  <span key={id} className="badge badge-soft">{mcpById(id)?.icon} {mcpById(id)?.name ?? id}</span>
+                  <span key={id} className="badge badge-soft"><Icon name={mcpById(id)?.icon ?? "spark"} size={12} /> {mcpById(id)?.name ?? id}</span>
                 ))}
               </div>
             </Link>

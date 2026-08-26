@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/useAuth";
 import { mcpById } from "../../lib/mcps";
+import { Icon } from "../components/Icon";
 
 const TEMPLATES = [
   {
@@ -58,7 +59,7 @@ export default function Hire() {
             <div style={{ fontWeight: 650, fontSize: 16, marginBottom: 6 }}>{t.name}</div>
             <div className="text-2" style={{ fontSize: 14, flex: 1 }}>{t.blurb}</div>
             <div style={{ display: "flex", gap: 6, margin: "14px 0", flexWrap: "wrap" }}>
-              {t.mcps.map((id) => <span key={id} className="badge badge-soft">{mcpById(id)?.icon} {mcpById(id)?.name}</span>)}
+              {t.mcps.map((id) => <span key={id} className="badge badge-soft"><Icon name={mcpById(id)?.icon ?? "spark"} size={12} /> {mcpById(id)?.name}</span>)}
             </div>
             <button className="btn btn-solid btn-sm" onClick={() => hire(t)} disabled={busy === t.name}>{busy === t.name ? "Adding…" : "Hire this agent"}</button>
           </div>

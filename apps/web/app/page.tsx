@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "./components/Icon";
 
 export default function Landing() {
   return (
@@ -21,13 +22,13 @@ export default function Landing() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 16, marginTop: 64, textAlign: "left" }}>
         {[
-          { t: "Create agents", d: "Name it, write its strategy & instructions — its own agent.md.", i: "🤖" },
-          { t: "Connect MCPs", d: "Technical analysis, DeFiLlama, Moralis on-chain, Orderly.", i: "🔌" },
-          { t: "Trade on Orderly", d: "Execute perps, track balance, PnL, and Sharpe ratio.", i: "⚡" },
-          { t: "Just converse", d: "Agentic, Claude-style chat that shows its thinking.", i: "💬" },
+          { t: "Create agents", d: "Name it, write its strategy & instructions — its own agent.md.", i: "cpu" },
+          { t: "Connect MCPs", d: "Technical analysis, DeFiLlama, Moralis on-chain, Orderly.", i: "plug" },
+          { t: "Trade on Orderly", d: "Execute perps, track balance, PnL, and Sharpe ratio.", i: "bolt" },
+          { t: "Just converse", d: "Agentic terminal chat that shows its thinking.", i: "terminal" },
         ].map((f) => (
           <div key={f.t} className="card-flat">
-            <div style={{ fontSize: 24, marginBottom: 10 }}>{f.i}</div>
+            <div style={{ width: 40, height: 40, borderRadius: 11, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand-ring)", marginBottom: 12 }}><Icon name={f.i} size={20} /></div>
             <div style={{ fontWeight: 650, marginBottom: 5 }}>{f.t}</div>
             <div className="muted" style={{ fontSize: 14 }}>{f.d}</div>
           </div>

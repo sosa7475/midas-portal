@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "../../../lib/api";
 import { useAuth } from "../../../lib/useAuth";
 import { MCPS } from "../../../lib/mcps";
+import { Icon } from "../../components/Icon";
 
 const TEMPLATE = `# Strategy
 Describe how this agent should trade in plain English.
@@ -69,7 +70,7 @@ export default function NewAgent() {
               return (
                 <div key={m.id} onClick={() => toggle(m.id)} className="card-flat" style={{ padding: 16, cursor: "pointer", borderColor: on ? "var(--brand)" : "var(--border)", background: on ? "var(--brand-soft)" : "var(--surface)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                    <span style={{ fontSize: 20 }}>{m.icon}</span>
+                    <span style={{ color: on ? "var(--brand)" : "var(--text-2)" }}><Icon name={m.icon} size={19} /></span>
                     <span style={{ fontWeight: 650, flex: 1 }}>{m.name}</span>
                     <span style={{ width: 18, height: 18, borderRadius: 999, border: `2px solid ${on ? "var(--brand)" : "var(--border-strong)"}`, background: on ? "var(--brand)" : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11 }}>{on ? "✓" : ""}</span>
                   </div>

@@ -19,10 +19,11 @@ export async function defiData(kind: string, queryStr?: string) {
       pools = pools.filter((p) => `${p.symbol} ${p.project} ${p.chain}`.toLowerCase().includes(q));
     }
     return pools
-      .filter((p) => p.tvlUsd > 1_000_000)
+      // Realistic pools: meaningful TVL, sane APY (exclude degen/mispriced outliers).
+      .filter((p) => p.tvlUsd > 5_000_000 && p.apy > 0 && p.apy < 300)
       .sort((a, b) => b.apy - a.apy)
       .slice(0, 12)
-      .map((p) => ({ symbol: p.symbol, project: p.project, chain: p.chain, apy: p.apy, tvlUsd: p.tvlUsd }));
+      .map((p) => ({ symbol: p.symbol, project: p.project, chain: p.chain, apy: Math.round(p.apy * 100) / 100, tvlUsd: Math.round(p.tvlUsd) }));
   }
   // chains
   const d: any = await j("https://api.llama.fi/v2/chains");
