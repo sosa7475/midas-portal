@@ -35,8 +35,8 @@ export const MCPS: McpDef[] = [
     icon: "link",
     category: "On-chain",
     description: "Wallet & token analytics, holder concentration, smart-money flows, transfers.",
-    ready: false,
-    status: "Connect API key",
+    ready: true,
+    status: "Live · on-chain data",
   },
   {
     id: "opensea",
