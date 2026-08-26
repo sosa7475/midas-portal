@@ -63,8 +63,14 @@ export async function openseaMcp(tool: string, args: Record<string, unknown>): P
   return result ?? { error: "no result" };
 }
 
-// Curated tool surface for the agent.
+// Curated tool surface for the agent (names/args match the OpenSea MCP tools/list).
 export function openseaSearch(query: string) { return openseaMcp("search", { query }); }
-export function openseaCollection(collection: string) { return openseaMcp("get_collection", { collection, includes: ["stats", "floor_prices"] }); }
+export async function openseaCollection(collection: string) {
+  const [stats, floors] = await Promise.all([
+    openseaMcp("get_collection_stats", { slug: collection }),
+    openseaMcp("get_collection_floor_prices", { slug: collection }).catch(() => null),
+  ]);
+  return { slug: collection, stats, floorPrices: floors };
+}
 export function openseaTrending(timeframe = "ONE_DAY") { return openseaMcp("get_trending_collections", { timeframe }); }
 export function openseaWallet(address: string) { return openseaMcp("get_nft_balances", { address }); }
