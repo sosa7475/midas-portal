@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, setToken } from "../../lib/api";
+import { api } from "../../lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,8 +17,8 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      const res = mode === "login" ? await api.auth.login(email, password) : await api.auth.register(email, password);
-      setToken(res.token);
+      if (mode === "login") await api.auth.login(email, password);
+      else await api.auth.register(email, password);
       router.push("/overview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");

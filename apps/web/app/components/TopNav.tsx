@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getToken, setToken } from "../../lib/api";
+import { api, getToken } from "../../lib/api";
 
 const TABS = [
   { label: "Overview", href: "/overview" },
@@ -45,7 +45,7 @@ export function TopNav() {
       {authed && (
         <button
           className="btn btn-ghost btn-sm"
-          onClick={() => { setToken(null); router.push("/login"); }}
+          onClick={async () => { await api.auth.logout(); router.push("/login"); }}
         >
           Sign out
         </button>
