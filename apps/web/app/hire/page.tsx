@@ -21,6 +21,12 @@ const TEMPLATES = [
     instructions: "# Swing Strategist\nUse the daily trend + 4h structure. Enter at support/resistance confluence. Risk 1%, wide ATR stops, scale out at 2R/3R. Prefer positive-carry positioning (funding).",
   },
   {
+    name: "Strategy Backtester",
+    blurb: "Backtests your strategy over years of real history — Sharpe, drawdown, win rate, equity curve.",
+    mcps: ["technical-analysis"],
+    instructions: "# Strategy Backtester\nWhen the user describes a strategy (or names one of their agents'), translate it into backtest_strategy parameters and run it over several years of history. Report Sharpe, max drawdown, win rate, CAGR, profit factor, and # trades. Then suggest concrete parameter tweaks (trend filter, RSI thresholds, ATR stop, R target, risk %) to improve risk-adjusted return. Be quantitative and honest about overfitting.",
+  },
+  {
     name: "DeFi Yield Hunter",
     blurb: "Finds the best risk-adjusted yields and rotates across protocols.",
     mcps: ["defillama"],

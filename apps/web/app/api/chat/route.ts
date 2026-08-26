@@ -7,9 +7,10 @@ import { getCandles, getSnapshot, normalizeSymbol, summarize } from "../../../li
 import { defiData } from "../../../lib/server/defi";
 import { onchain, moralisReady } from "../../../lib/server/moralis";
 import { openseaSearch, openseaCollection, openseaTrending, openseaWallet, openseaReady } from "../../../lib/server/opensea";
+import { fetchHistory, runBacktest } from "../../../lib/server/backtest";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 type Tool = OpenAI.Chat.Completions.ChatCompletionTool;
 
@@ -20,15 +21,28 @@ function fnTool(name: string, description: string, parameters: Record<string, un
 // One entry per MCP: how to describe it to the agent + the tools it unlocks.
 const MCP_REGISTRY: Record<string, { capability: string; tools: Tool[] }> = {
   "technical-analysis": {
-    capability: "Technical Analysis (tool: analyze_market) — live price, RSI, EMA, MACD, ATR, funding & open interest for any perp.",
-    tools: [{
-      type: "function",
-      function: {
-        name: "analyze_market",
-        description: "Live market snapshot + indicators (RSI, EMA, MACD, ATR, funding, OI) for a perp symbol like BTC, ETH, SOL.",
-        parameters: { type: "object", properties: { symbol: { type: "string" }, interval: { type: "string", enum: ["15m", "1h", "4h", "1d"] } }, required: ["symbol"] },
-      },
-    }],
+    capability: "Technical Analysis (tools: analyze_market, backtest_strategy) — live price/RSI/EMA/MACD/ATR/funding, PLUS deterministic multi-year backtesting. When asked to backtest, translate the strategy into backtest_strategy params and report Sharpe, max drawdown, win rate, CAGR, profit factor.",
+    tools: [
+      fnTool("analyze_market", "Live market snapshot + indicators (RSI, EMA, MACD, ATR, funding, OI) for a perp symbol like BTC, ETH, SOL.", { type: "object", properties: { symbol: { type: "string" }, interval: { type: "string", enum: ["15m", "1h", "4h", "1d"] } }, required: ["symbol"] }),
+      fnTool("backtest_strategy", "Backtest a strategy over several years of real exchange history. YOU translate the agent's strategy into these parameters; all provided entry conditions must hold together. Returns Sharpe, max drawdown, win rate, CAGR, profit factor, # trades, equity curve.", {
+        type: "object",
+        properties: {
+          symbol: { type: "string", description: "e.g. BTC, ETH, SOL" },
+          interval: { type: "string", enum: ["15m", "1h", "4h", "1d"] },
+          years: { type: "number", description: "years of history, e.g. 3" },
+          direction: { type: "string", enum: ["long", "short", "both"] },
+          emaFast: { type: "number", description: "fast EMA for trend filter (e.g. 20); omit for no trend filter" },
+          emaSlow: { type: "number", description: "slow EMA for trend filter (e.g. 50)" },
+          rsiEntryBelow: { type: "number", description: "enter when RSI below this (mean-reversion), e.g. 35" },
+          rsiEntryAbove: { type: "number", description: "enter when RSI above this (momentum), e.g. 55" },
+          useMacd: { type: "boolean", description: "require MACD histogram to agree with direction" },
+          stopAtrMult: { type: "number", description: "stop = ATR × this, e.g. 1.5" },
+          takeProfitR: { type: "number", description: "target = risk × this R, e.g. 2" },
+          riskPct: { type: "number", description: "% equity risked per trade, e.g. 1" },
+        },
+        required: ["symbol", "interval", "years", "direction", "stopAtrMult", "takeProfitR", "riskPct"],
+      }),
+    ],
   },
   defillama: {
     capability: "DeFiLlama (tool: defi_data) — DeFi PROTOCOL/market data: protocol TVL, top yield pools (APY), and chain-level TVL. Use it for 'best yields', 'TVL of X', 'top chains'. NOTE: this is NOT wallet on-chain data.",
@@ -78,6 +92,12 @@ async function runTool(name: string, args: any) {
   if (name === "nft_collection") return openseaCollection(args.collection);
   if (name === "nft_trending") return openseaTrending(args.timeframe || "ONE_DAY");
   if (name === "nft_wallet") return openseaWallet(args.address);
+  if (name === "backtest_strategy") {
+    const years = Math.min(Math.max(args.years || 3, 0.25), 10);
+    const candles = await fetchHistory(args.symbol, args.interval, years);
+    if (candles.length < 60) return { error: `Not enough history for ${args.symbol} ${args.interval}` };
+    return runBacktest(candles, { ...args, years });
+  }
   return { error: "unknown tool" };
 }
 
