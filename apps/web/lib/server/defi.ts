@@ -1,4 +1,34 @@
-/** DeFiLlama — keyless. Protocol TVL, top yields, chain TVL. */
+/** DeFiLlama — keyless. Protocol TVL, top yields, chain TVL, historical macro filter. */
+
+/**
+ * Per-bar "risk-on" signal for backtesting: true when total DeFi TVL is higher
+ * than ~30 days earlier (capital flowing in). Aligned to the given candles.
+ */
+export async function defiRiskOnSeries(candles: { time: number }[]): Promise<(boolean | null)[]> {
+  let pts: { t: number; tvl: number }[];
+  try {
+    const r = await fetch("https://api.llama.fi/v2/historicalChainTvl", { signal: AbortSignal.timeout(12_000) });
+    const raw = (await r.json()) as { date: number; tvl: number }[];
+    pts = raw.map((p) => ({ t: p.date * 1000, tvl: p.tvl })).sort((a, b) => a.t - b.t);
+  } catch {
+    return candles.map(() => null);
+  }
+  const DAY = 864e5;
+  const tvlAt = (ms: number): number | null => {
+    // last point with t <= ms (binary search)
+    let lo = 0, hi = pts.length - 1, res = -1;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (pts[mid].t <= ms) { res = mid; lo = mid + 1; } else hi = mid - 1; }
+    return res >= 0 ? pts[res].tvl : null;
+  };
+  return candles.map((c) => {
+    const now = tvlAt(c.time);
+    const prev = tvlAt(c.time - 30 * DAY);
+    if (now == null || prev == null) return null;
+    return now > prev;
+  });
+}
+
+
 async function j(url: string) {
   const r = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!r.ok) throw new Error(`DefiLlama ${r.status}`);

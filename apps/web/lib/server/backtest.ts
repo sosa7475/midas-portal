@@ -104,7 +104,7 @@ export interface BacktestResult {
   note?: string;
 }
 
-export function runBacktest(candles: Candle[], s: StrategySpec): BacktestResult {
+export function runBacktest(candles: Candle[], s: StrategySpec, riskOn?: (boolean | null)[]): BacktestResult {
   const closes = candles.map((c) => c.close);
   const ef = s.emaFast ? emaSeries(closes, s.emaFast) : null;
   const es = s.emaSlow ? emaSeries(closes, s.emaSlow) : null;
@@ -161,8 +161,11 @@ export function runBacktest(candles: Candle[], s: StrategySpec): BacktestResult 
       }
     }
     if (!pos && atr[i] != null && atr[i]! > 0) {
-      const wantLong = (s.direction === "long" || s.direction === "both") && longOk(i);
-      const wantShort = (s.direction === "short" || s.direction === "both") && shortOk(i);
+      // Optional macro/DeFi regime filter: longs only when risk-on, shorts when risk-off.
+      const macroLong = !riskOn || riskOn[i] === true;
+      const macroShort = !riskOn || riskOn[i] === false;
+      const wantLong = (s.direction === "long" || s.direction === "both") && longOk(i) && macroLong;
+      const wantShort = (s.direction === "short" || s.direction === "both") && shortOk(i) && macroShort;
       const dir: 1 | -1 | 0 = wantLong ? 1 : wantShort ? -1 : 0;
       if (dir !== 0) {
         const entry = c.close * (1 + dir * slip);

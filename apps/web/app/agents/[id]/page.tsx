@@ -11,6 +11,7 @@ interface Msg {
   role: "user" | "agent";
   text: string;
   tools?: { name: string; args: any; done?: boolean }[];
+  backtest?: any;
   streaming?: boolean;
 }
 
@@ -39,6 +40,7 @@ export default function AgentChat({ params }: { params: Promise<{ id: string }> 
         const copy = [...m]; const last = copy[copy.length - 1];
         if (last?.role !== "agent") return m;
         if (e.type === "tool") last.tools = [...(last.tools ?? []).map(t => ({ ...t, done: true })), { name: e.name, args: e.args }];
+        else if (e.type === "backtest") { last.backtest = e.result; last.tools = last.tools?.map(t => ({ ...t, done: true })); }
         else if (e.type === "delta") { last.tools = last.tools?.map(t => ({ ...t, done: true })); last.text += e.content; }
         else if (e.type === "error") { last.text += `\n[error] ${e.error}`; last.streaming = false; setBusy(false); }
         else if (e.type === "done") { last.streaming = false; last.tools = last.tools?.map(t => ({ ...t, done: true })); setBusy(false); }
@@ -110,11 +112,57 @@ function Line({ m }: { m: Msg }) {
           <span style={{ marginLeft: 8, color: t.done ? "var(--green)" : "var(--text-muted)" }}>{t.done ? "✓" : <span className="dot-pulse">…</span>}</span>
         </div>
       ))}
+      {m.backtest && <BacktestCard r={m.backtest} />}
       <div style={{ whiteSpace: "pre-wrap", color: "var(--text)" }}>
         {m.text}
         {m.streaming && <span style={{ color: "var(--brand)", animation: "blink 1s step-end infinite" }}>▋</span>}
         {m.streaming && !m.text && <span className="muted">running…</span>}
       </div>
+    </div>
+  );
+}
+
+function BacktestCard({ r }: { r: any }) {
+  const curve: number[] = r.equityCurve ?? [];
+  const W = 620, H = 130, pad = 6;
+  const min = Math.min(...curve, 10000), max = Math.max(...curve, 10000);
+  const x = (i: number) => pad + (i / Math.max(1, curve.length - 1)) * (W - 2 * pad);
+  const y = (v: number) => pad + (1 - (v - min) / (max - min || 1)) * (H - 2 * pad);
+  const path = curve.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+  const area = `${path} L${x(curve.length - 1).toFixed(1)} ${H - pad} L${x(0).toFixed(1)} ${H - pad} Z`;
+  const up = curve.length > 1 && curve[curve.length - 1] >= curve[0];
+  const col = up ? "var(--green)" : "var(--red)";
+  const stats: [string, string][] = [
+    ["Return", `${r.totalReturnPct > 0 ? "+" : ""}${r.totalReturnPct}%`],
+    ["CAGR", r.cagrPct != null ? `${r.cagrPct}%` : "—"],
+    ["Sharpe", r.sharpe != null ? String(r.sharpe) : "—"],
+    ["Max DD", `${r.maxDrawdownPct}%`],
+    ["Win rate", r.winRatePct != null ? `${r.winRatePct}%` : "—"],
+    ["Profit factor", r.profitFactor != null ? String(r.profitFactor) : "—"],
+    ["Trades", String(r.trades)],
+    ["Exposure", `${r.exposurePct}%`],
+  ];
+  return (
+    <div className="card" style={{ margin: "6px 0 12px", padding: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+        <div style={{ fontWeight: 650, fontSize: 14 }} className="mono">{r.symbol} · {r.interval}</div>
+        <div className="muted mono" style={{ fontSize: 12 }}>{r.from} → {r.to} · {r.bars} bars</div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" style={{ display: "block" }}>
+        <defs><linearGradient id="eq" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={col} stopOpacity="0.22" /><stop offset="100%" stopColor={col} stopOpacity="0" /></linearGradient></defs>
+        <line x1={pad} y1={y(10000)} x2={W - pad} y2={y(10000)} stroke="var(--border-strong)" strokeWidth="1" strokeDasharray="3 4" />
+        <path d={area} fill="url(#eq)" />
+        <path d={path} fill="none" stroke={col} strokeWidth="2" />
+      </svg>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 12 }}>
+        {stats.map(([k, v]) => (
+          <div key={k}>
+            <div className="muted" style={{ fontSize: 11 }}>{k}</div>
+            <div className="mono" style={{ fontWeight: 650, fontSize: 14 }}>{v}</div>
+          </div>
+        ))}
+      </div>
+      {r.note && <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>{r.note}</div>}
     </div>
   );
 }

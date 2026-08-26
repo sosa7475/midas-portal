@@ -4,7 +4,7 @@ import { getSession } from "../../../lib/server/auth";
 import { query } from "../../../lib/server/db";
 import { ensureAgentsTable } from "../../../lib/server/agents-sql";
 import { getCandles, getSnapshot, normalizeSymbol, summarize } from "../../../lib/server/market";
-import { defiData } from "../../../lib/server/defi";
+import { defiData, defiRiskOnSeries } from "../../../lib/server/defi";
 import { onchain, moralisReady } from "../../../lib/server/moralis";
 import { openseaSearch, openseaCollection, openseaTrending, openseaWallet, openseaReady } from "../../../lib/server/opensea";
 import { fetchHistory, runBacktest } from "../../../lib/server/backtest";
@@ -39,6 +39,7 @@ const MCP_REGISTRY: Record<string, { capability: string; tools: Tool[] }> = {
           stopAtrMult: { type: "number", description: "stop = ATR × this, e.g. 1.5" },
           takeProfitR: { type: "number", description: "target = risk × this R, e.g. 2" },
           riskPct: { type: "number", description: "% equity risked per trade, e.g. 1" },
+          defiTrendFilter: { type: "boolean", description: "DeFi macro filter: only take longs when total DeFi TVL is rising (risk-on), shorts when falling. Uses DeFiLlama history." },
         },
         required: ["symbol", "interval", "years", "direction", "stopAtrMult", "takeProfitR", "riskPct"],
       }),
@@ -96,7 +97,8 @@ async function runTool(name: string, args: any) {
     const years = Math.min(Math.max(args.years || 3, 0.25), 10);
     const candles = await fetchHistory(args.symbol, args.interval, years);
     if (candles.length < 60) return { error: `Not enough history for ${args.symbol} ${args.interval}` };
-    return runBacktest(candles, { ...args, years });
+    const riskOn = args.defiTrendFilter ? await defiRiskOnSeries(candles) : undefined;
+    return runBacktest(candles, { ...args, years }, riskOn);
   }
   return { error: "unknown tool" };
 }
@@ -165,8 +167,14 @@ ${instructions || "(none)"}`;
             for (const tc of c.message.tool_calls) {
               const args = JSON.parse(tc.function.arguments || "{}");
               send({ type: "tool", name: tc.function.name, args });
-              let result: unknown;
+              let result: any;
               try { result = await runTool(tc.function.name, args); } catch (e) { result = { error: String(e) }; }
+              // Backtest: push the equity curve to the client for a chart, give the LLM metrics only.
+              if (tc.function.name === "backtest_strategy" && result?.equityCurve) {
+                send({ type: "backtest", result });
+                const { equityCurve, ...metrics } = result;
+                result = metrics;
+              }
               messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result).slice(0, 8000) });
             }
             continue;
