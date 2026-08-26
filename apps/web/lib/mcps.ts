@@ -39,6 +39,15 @@ export const MCPS: McpDef[] = [
     status: "Connect API key",
   },
   {
+    id: "opensea",
+    name: "OpenSea",
+    icon: "nft",
+    category: "NFT",
+    description: "NFT collections, floor prices, trending, wallet holdings & marketplace analysis via OpenSea.",
+    ready: true,
+    status: "Live · NFT data",
+  },
+  {
     id: "orderly",
     name: "Orderly",
     icon: "bolt",

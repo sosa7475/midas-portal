@@ -6,11 +6,16 @@ import { ensureAgentsTable } from "../../../lib/server/agents-sql";
 import { getCandles, getSnapshot, normalizeSymbol, summarize } from "../../../lib/server/market";
 import { defiData } from "../../../lib/server/defi";
 import { onchain, moralisReady } from "../../../lib/server/moralis";
+import { openseaSearch, openseaCollection, openseaTrending, openseaWallet, openseaReady } from "../../../lib/server/opensea";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type Tool = OpenAI.Chat.Completions.ChatCompletionTool;
+
+function fnTool(name: string, description: string, parameters: Record<string, unknown>): Tool {
+  return { type: "function", function: { name, description, parameters } };
+}
 
 // One entry per MCP: how to describe it to the agent + the tools it unlocks.
 const MCP_REGISTRY: Record<string, { capability: string; tools: Tool[] }> = {
@@ -47,6 +52,15 @@ const MCP_REGISTRY: Record<string, { capability: string; tools: Tool[] }> = {
       },
     }],
   },
+  opensea: {
+    capability: "OpenSea (tools: nft_search, nft_collection, nft_trending, nft_wallet) — NFT marketplace data: search collections/items, floor prices & stats, trending collections, and NFTs held by a wallet. Use for any NFT question.",
+    tools: [
+      fnTool("nft_search", "AI-powered search across OpenSea for NFT collections, items, and tokens by name/query.", { type: "object", properties: { query: { type: "string" } }, required: ["query"] }),
+      fnTool("nft_collection", "Floor price, volume, sales and stats for a specific NFT collection slug (e.g. boredapeyachtclub).", { type: "object", properties: { collection: { type: "string" } }, required: ["collection"] }),
+      fnTool("nft_trending", "Trending NFT collections. timeframe: ONE_HOUR, ONE_DAY, or SEVEN_DAYS.", { type: "object", properties: { timeframe: { type: "string" } } }),
+      fnTool("nft_wallet", "NFTs owned by a wallet address.", { type: "object", properties: { address: { type: "string" } }, required: ["address"] }),
+    ],
+  },
   orderly: {
     capability: "Orderly (execution & account performance) — perp execution, balance, positions, PnL, Sharpe. Requires the user to connect their Orderly account in Wallet; until then, tell them to connect it.",
     tools: [],
@@ -60,6 +74,10 @@ async function runTool(name: string, args: any) {
   }
   if (name === "defi_data") return defiData(args.kind, args.query);
   if (name === "onchain_data") return onchain(args.kind, args.address, args.chain || "eth");
+  if (name === "nft_search") return openseaSearch(args.query);
+  if (name === "nft_collection") return openseaCollection(args.collection);
+  if (name === "nft_trending") return openseaTrending(args.timeframe || "ONE_DAY");
+  if (name === "nft_wallet") return openseaWallet(args.address);
   return { error: "unknown tool" };
 }
 
@@ -89,8 +107,11 @@ export async function POST(req: NextRequest) {
     capabilities.push(`- ${entry.capability}`);
     tools.push(...entry.tools);
   }
-  const moralisNote = mcps.includes("moralis") && !moralisReady()
-    ? "\n(Note: Moralis is connected but no API key is configured yet, so onchain_data will return a not-connected message.)"
+  const notConnected: string[] = [];
+  if (mcps.includes("moralis") && !moralisReady()) notConnected.push("Moralis (onchain_data)");
+  if (mcps.includes("opensea") && !openseaReady()) notConnected.push("OpenSea (nft_* tools)");
+  const moralisNote = notConnected.length
+    ? `\n(Note: ${notConnected.join(" and ")} are selected but no API key is configured yet, so those tools return a not-connected message.)`
     : "";
 
   const system = `You are "${agentName}", an agentic crypto trading assistant on Midas. You think briefly, call your connected MCP tools to get live data, then give clear, disciplined, conversational guidance citing real numbers.

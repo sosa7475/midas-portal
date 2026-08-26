@@ -21,6 +21,7 @@ const P: Record<string, ReactNode> = {
   send: <path d="M4 12l16-8-6 16-3-6-7-2z" />,
   terminal: <><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M7 9l3 3-3 3M13 15h4" /></>,
   spark: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" />,
+  nft: <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" /></>,
 };
 
 export function Icon({ name, size = 18, style }: { name: string; size?: number; style?: CSSProperties }) {
