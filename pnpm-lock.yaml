@@ -197,12 +197,24 @@ importers:
 
   apps/web:
     dependencies:
-      '@midas/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
+      '@anthropic-ai/sdk':
+        specifier: ^0.39.0
+        version: 0.39.0
+      bcryptjs:
+        specifier: ^2.4.3
+        version: 2.4.3
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
       next:
         specifier: ^15.1.6
         version: 15.5.20(babel-plugin-react-compiler@1.0.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      openai:
+        specifier: ^4.77.0
+        version: 4.104.0(ws@8.21.0)(zod@3.25.76)
+      pg:
+        specifier: ^8.13.3
+        version: 8.22.0
       react:
         specifier: 19.1.0
         version: 19.1.0
@@ -213,9 +225,18 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      '@types/bcryptjs':
+        specifier: ^2.4.6
+        version: 2.4.6
+      '@types/jsonwebtoken':
+        specifier: ^9.0.7
+        version: 9.0.10
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
       '@types/react':
         specifier: ^19.0.0
         version: 19.0.14

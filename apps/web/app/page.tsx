@@ -1,62 +1,38 @@
 import Link from "next/link";
 
-/**
- * Landing shell (Phase 1). Phase 4 builds the full marketing page —
- * this establishes the glass aesthetic and the public front door.
- */
 export default function Landing() {
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        textAlign: "center",
-      }}
-    >
-      <div className="glass" style={{ maxWidth: 720, padding: "64px 48px" }}>
-        <p
-          style={{
-            color: "var(--primary)",
-            fontWeight: 600,
-            letterSpacing: 2,
-            fontSize: 13,
-            textTransform: "uppercase",
-            marginBottom: 16,
-          }}
-        >
-          Midas Portal
-        </p>
-        <h1 style={{ fontSize: 44, lineHeight: 1.15, marginBottom: 20 }}>
-          Trade with an agent.
-          <br />
-          <span style={{ color: "var(--primary)" }}>Keep the discipline.</span>
+    <main className="container" style={{ paddingTop: 90, paddingBottom: 80, textAlign: "center" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        <span className="badge badge-brand" style={{ marginBottom: 22 }}>◆ Agentic trading, your rules</span>
+        <h1 style={{ fontSize: 46, lineHeight: 1.1, marginBottom: 20 }}>
+          Build trading agents that<br />think like you do.
         </h1>
-        <p
-          style={{
-            color: "var(--text-secondary)",
-            fontSize: 18,
-            lineHeight: 1.6,
-            marginBottom: 36,
-          }}
-        >
-          Midas analyzes the market, checks every idea against your strategy, and executes
-          on-chain perps — but never without your confirmation. Emotional discipline,
-          enforced in code.
+        <p className="text-2" style={{ fontSize: 18, maxWidth: 560, margin: "0 auto 32px" }}>
+          Create your own AI agents, give them your strategy, and connect trading MCPs —
+          technical analysis, DeFiLlama, on-chain metrics, and Orderly for execution.
+          Then just talk to them.
         </p>
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-          <Link href="/login" className="btn-primary">
-            Enter the portal
-          </Link>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+          <Link href="/login" className="btn btn-solid" style={{ height: 46, padding: "0 26px" }}>Get started</Link>
+          <Link href="/login" className="btn btn-outline" style={{ height: 46, padding: "0 26px" }}>Sign in</Link>
         </div>
       </div>
-      <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 32, maxWidth: 560 }}>
-        Trading perpetual futures involves substantial risk of loss. Midas Portal is not
-        financial advice. Nothing here is a recommendation to buy or sell any asset.
-      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 16, marginTop: 64, textAlign: "left" }}>
+        {[
+          { t: "Create agents", d: "Name it, write its strategy & instructions — its own agent.md.", i: "🤖" },
+          { t: "Connect MCPs", d: "Technical analysis, DeFiLlama, Moralis on-chain, Orderly.", i: "🔌" },
+          { t: "Trade on Orderly", d: "Execute perps, track balance, PnL, and Sharpe ratio.", i: "⚡" },
+          { t: "Just converse", d: "Agentic, Claude-style chat that shows its thinking.", i: "💬" },
+        ].map((f) => (
+          <div key={f.t} className="card-flat">
+            <div style={{ fontSize: 24, marginBottom: 10 }}>{f.i}</div>
+            <div style={{ fontWeight: 650, marginBottom: 5 }}>{f.t}</div>
+            <div className="muted" style={{ fontSize: 14 }}>{f.d}</div>
+          </div>
+        ))}
+      </div>
     </main>
   );
 }

@@ -29,7 +29,7 @@ fi
 # 3. Create app if missing
 if ! "$FLY" apps list 2>/dev/null | grep -q "^$APP"; then
   echo "→ creating app $APP"
-  "$FLY" apps create "$APP"
+  "$FLY" apps create "$APP" -o personal
 fi
 
 # 4. Create upload volume if missing
@@ -42,8 +42,8 @@ fi
 echo "→ setting secrets"
 grep -E '^[A-Z_]+=' "$ENV_FILE" | grep -v 'PASTE_' | "$FLY" secrets import -a "$APP"
 
-echo "→ deploying (migrations run via release_command)"
-"$FLY" deploy --config apps/api/fly.toml -a "$APP"
+echo "→ deploying (remote builder; migrations run via release_command)"
+"$FLY" deploy "$ROOT" --config "$ROOT/apps/api/fly.toml" --dockerfile "$ROOT/apps/api/Dockerfile" -a "$APP" --remote-only
 
 echo "→ health check"
 sleep 3

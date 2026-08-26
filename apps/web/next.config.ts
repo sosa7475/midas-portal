@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@midas/shared"],
   poweredByHeader: false,
   async headers() {
     return [
