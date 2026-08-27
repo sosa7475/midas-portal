@@ -21,30 +21,42 @@ function fnTool(name: string, description: string, parameters: Record<string, un
   return { type: "function", function: { name, description, parameters } };
 }
 
+// Reusable schema for the backtest condition DSL.
+const OP = { type: "string", enum: [">", "<", ">=", "<=", "cross_above", "cross_below"] };
+const OPERAND = {
+  type: "object",
+  properties: {
+    ind: { type: "string", enum: ["close", "open", "high", "low", "volume", "ema", "sma", "rsi", "atr", "roc", "macd_line", "macd_signal", "macd_hist", "bb_upper", "bb_mid", "bb_lower", "donchian_high", "donchian_low"] },
+    period: { type: "number" }, mult: { type: "number" }, value: { type: "number" },
+  },
+};
+
 // One entry per MCP: how to describe it to the agent + the tools it unlocks.
 const MCP_REGISTRY: Record<string, { capability: string; tools: Tool[] }> = {
   "technical-analysis": {
-    capability: "Technical Analysis (tools: analyze_market, backtest_strategy) — live price/RSI/EMA/MACD/ATR/funding, PLUS deterministic multi-year backtesting. When asked to backtest, translate the strategy into backtest_strategy params and report Sharpe, max drawdown, win rate, CAGR, profit factor.",
+    capability: "Technical Analysis (tools: analyze_market, backtest_strategy) — live indicators PLUS a robust multi-year backtester. When asked to backtest, translate YOUR OWN strategy (from your creator instructions) faithfully into entry/exit CONDITIONS and run it. Report Sharpe, max drawdown, win rate, CAGR, profit factor. Be honest about overfitting.",
     tools: [
       fnTool("analyze_market", "Live market snapshot + indicators (RSI, EMA, MACD, ATR, funding, OI) for a perp symbol like BTC, ETH, SOL.", { type: "object", properties: { symbol: { type: "string" }, interval: { type: "string", enum: ["15m", "1h", "4h", "1d"] } }, required: ["symbol"] }),
-      fnTool("backtest_strategy", "Backtest a strategy over several years of real exchange history. YOU translate the agent's strategy into these parameters; all provided entry conditions must hold together. Returns Sharpe, max drawdown, win rate, CAGR, profit factor, # trades, equity curve.", {
+      fnTool("backtest_strategy", "Backtest a strategy over years of real history using an expressive condition engine. Express the strategy as entry/exit CONDITIONS. An OPERAND is {ind, period, mult} or {value}. ind ∈ close/open/high/low/volume/ema/sma/rsi/atr/roc/macd_line/macd_signal/macd_hist/bb_upper/bb_mid/bb_lower/donchian_high/donchian_low. A CONDITION is {left:OPERAND, op, right:OPERAND}, op ∈ >,<,>=,<=,cross_above,cross_below. entryLong/entryShort/exitLong/exitShort are arrays of conditions (ALL must hold = AND). Examples: EMA20>EMA50 = {left:{ind:'ema',period:20},op:'>',right:{ind:'ema',period:50}}; RSI<30 = {left:{ind:'rsi',period:14},op:'<',right:{value:30}}; breakout = {left:{ind:'close'},op:'cross_above',right:{ind:'donchian_high',period:20}}. Returns Sharpe/maxDD/winRate/CAGR/PF/equity curve.", {
         type: "object",
         properties: {
           symbol: { type: "string", description: "e.g. BTC, ETH, SOL" },
           interval: { type: "string", enum: ["15m", "1h", "4h", "1d"] },
-          years: { type: "number", description: "years of history, e.g. 3" },
+          years: { type: "number", description: "years of history, e.g. 4" },
           direction: { type: "string", enum: ["long", "short", "both"] },
-          emaFast: { type: "number", description: "fast EMA for trend filter (e.g. 20); omit for no trend filter" },
-          emaSlow: { type: "number", description: "slow EMA for trend filter (e.g. 50)" },
-          rsiEntryBelow: { type: "number", description: "enter when RSI below this (mean-reversion), e.g. 35" },
-          rsiEntryAbove: { type: "number", description: "enter when RSI above this (momentum), e.g. 55" },
-          useMacd: { type: "boolean", description: "require MACD histogram to agree with direction" },
-          stopAtrMult: { type: "number", description: "stop = ATR × this, e.g. 1.5" },
-          takeProfitR: { type: "number", description: "target = risk × this R, e.g. 2" },
+          entryLong: { type: "array", description: "conditions ANDed to enter long", items: { type: "object", properties: { left: OPERAND, op: OP, right: OPERAND }, required: ["left", "op", "right"] } },
+          entryShort: { type: "array", description: "conditions to enter short (if direction includes short)", items: { type: "object", properties: { left: OPERAND, op: OP, right: OPERAND }, required: ["left", "op", "right"] } },
+          exitLong: { type: "array", description: "optional: exit long when any condition true", items: { type: "object", properties: { left: OPERAND, op: OP, right: OPERAND }, required: ["left", "op", "right"] } },
+          exitShort: { type: "array", items: { type: "object", properties: { left: OPERAND, op: OP, right: OPERAND }, required: ["left", "op", "right"] } },
+          stopLossAtr: { type: "number", description: "stop = ATR(14) × this (e.g. 1.5)" },
+          stopLossPct: { type: "number", description: "or a fixed % stop" },
+          takeProfitR: { type: "number", description: "target = risk × this R (e.g. 2)" },
+          takeProfitPct: { type: "number" },
+          trailAtr: { type: "number", description: "trailing stop = ATR(14) × this" },
           riskPct: { type: "number", description: "% equity risked per trade, e.g. 1" },
-          defiTrendFilter: { type: "boolean", description: "DeFi macro filter: only take longs when total DeFi TVL is rising (risk-on), shorts when falling. Uses DeFiLlama history." },
+          defiTrendFilter: { type: "boolean", description: "DeFi macro filter: longs only when total DeFi TVL is rising (risk-on)." },
         },
-        required: ["symbol", "interval", "years", "direction", "stopAtrMult", "takeProfitR", "riskPct"],
+        required: ["symbol", "interval", "years", "direction", "riskPct"],
       }),
     ],
   },
