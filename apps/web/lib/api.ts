@@ -58,11 +58,11 @@ export const api = {
     remove: (id: string) => req("DELETE", `/api/agents/${id}`),
   },
   orderly: {
-    status: () => req("GET", "/api/orderly/status"),
-    account: () => req("GET", "/api/orderly/account"),
-    generate: () => req("POST", "/api/orderly/connect", { mode: "generate" }),
-    connectKey: (c: { accountId: string; orderlyKey: string; secretHex: string; network: string }) => req("POST", "/api/orderly/connect", { mode: "apikey", ...c }),
-    disconnect: () => req("POST", "/api/orderly/disconnect"),
+    list: () => req("GET", "/api/orderly/list"),
+    account: (agentId: string) => req("GET", `/api/orderly/account?agentId=${agentId}`),
+    generate: (agentId: string) => req("POST", "/api/orderly/connect", { mode: "generate", agentId }),
+    connectKey: (agentId: string, c: { accountId: string; orderlyKey: string; secretHex: string; network: string }) => req("POST", "/api/orderly/connect", { mode: "apikey", agentId, ...c }),
+    disconnect: (agentId: string) => req("POST", "/api/orderly/disconnect", { agentId }),
   },
 };
 
