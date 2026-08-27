@@ -57,6 +57,13 @@ export const api = {
     create: (a: { name: string; instructions: string; mcps: string[] }) => req("POST", "/api/agents", a),
     remove: (id: string) => req("DELETE", `/api/agents/${id}`),
   },
+  orderly: {
+    status: () => req("GET", "/api/orderly/status"),
+    account: () => req("GET", "/api/orderly/account"),
+    generate: () => req("POST", "/api/orderly/connect", { mode: "generate" }),
+    connectKey: (c: { accountId: string; orderlyKey: string; secretHex: string; network: string }) => req("POST", "/api/orderly/connect", { mode: "apikey", ...c }),
+    disconnect: () => req("POST", "/api/orderly/disconnect"),
+  },
 };
 
 /** Stream a chat message. Cookie is sent automatically (same-origin). Returns an abort fn. */
