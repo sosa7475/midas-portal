@@ -57,6 +57,14 @@ function AgentWallet({ agent, status, onConnectKey, onChange }: { agent: any; st
 
   async function generate() { setBusy("gen"); try { await api.orderly.generate(agent.id); await onChange(); } finally { setBusy(null); } }
   async function disconnect() { setBusy("disc"); await api.orderly.disconnect(agent.id).catch(() => {}); setAccount(null); await onChange(); setBusy(null); }
+  async function fund() {
+    setBusy("fund");
+    try {
+      await api.orderly.faucet(agent.id);
+      // balance takes a few seconds to reflect — poll a couple times
+      for (let i = 0; i < 4; i++) { await new Promise((r) => setTimeout(r, 2500)); const a = await api.orderly.account(agent.id).catch(() => null); if (a?.equity > 0) { setAccount(a); break; } setAccount(a); }
+    } finally { setBusy(null); }
+  }
 
   return (
     <div className="card">
@@ -83,8 +91,9 @@ function AgentWallet({ agent, status, onConnectKey, onChange }: { agent: any; st
               <div key={k}><div className="muted" style={{ fontSize: 11 }}>{k}</div><div style={{ fontWeight: 700, fontSize: 16 }}>{v}</div></div>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", marginTop: 14 }}>
-            {status.address && <span className="muted mono" style={{ fontSize: 12 }}>Fund {status.address.slice(0, 10)}… on {status.network}.</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+            {status.network === "testnet" && <button className="btn btn-outline btn-sm" onClick={fund} disabled={busy === "fund"}>{busy === "fund" ? "Funding…" : "Get testnet USDC"}</button>}
+            {status.address && <span className="muted mono" style={{ fontSize: 12 }}>{status.address.slice(0, 10)}… · {status.network}</span>}
             <div style={{ flex: 1 }} />
             <button className="btn btn-ghost btn-sm" onClick={disconnect} disabled={busy === "disc"}>Disconnect</button>
           </div>

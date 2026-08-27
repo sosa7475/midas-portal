@@ -63,6 +63,8 @@ export const api = {
     generate: (agentId: string) => req("POST", "/api/orderly/connect", { mode: "generate", agentId }),
     connectKey: (agentId: string, c: { accountId: string; orderlyKey: string; secretHex: string; network: string }) => req("POST", "/api/orderly/connect", { mode: "apikey", agentId, ...c }),
     disconnect: (agentId: string) => req("POST", "/api/orderly/disconnect", { agentId }),
+    order: (agentId: string, o: { symbol: string; side: string; type?: string; quantity: number; price?: number; reduceOnly?: boolean }) => req("POST", "/api/orderly/order", { agentId, ...o }),
+    faucet: (agentId: string) => req("POST", "/api/orderly/faucet", { agentId }),
   },
 };
 

@@ -8,6 +8,9 @@ import { defiData, defiRiskOnSeries } from "../../../lib/server/defi";
 import { onchain, moralisReady } from "../../../lib/server/moralis";
 import { openseaSearch, openseaCollection, openseaTrending, openseaWallet, openseaReady } from "../../../lib/server/opensea";
 import { fetchHistory, runBacktest } from "../../../lib/server/backtest";
+import { OrderlyClient } from "../../../lib/server/orderly";
+import { loadOrderly } from "../../../lib/server/orderly-sql";
+import { checkOrder } from "../../../lib/server/risk";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -128,10 +131,38 @@ export async function POST(req: NextRequest) {
   const tools: Tool[] = [];
   const capabilities: string[] = [];
   for (const id of mcps) {
+    if (id === "orderly") continue; // handled below (depends on connection state)
     const entry = MCP_REGISTRY[id];
     if (!entry) continue;
     capabilities.push(`- ${entry.capability}`);
     tools.push(...entry.tools);
+  }
+
+  // Orderly/QuickPerps trading — only when THIS agent has its own connected account.
+  const orderlyCreds = mcps.includes("orderly") && persist ? await loadOrderly(session!.userId, agentId!) : null;
+  if (mcps.includes("orderly")) {
+    if (orderlyCreds) {
+      capabilities.push("- Orderly/QuickPerps (tools: get_account, get_positions, place_trade) — this agent has its OWN segregated account. get_account/get_positions read live. place_trade PROPOSES an order the user must explicitly confirm before it executes — never claim a trade filled; report what you proposed.");
+      tools.push(
+        fnTool("get_account", "This agent's live Orderly balance, free collateral and holdings.", { type: "object", properties: {} }),
+        fnTool("get_positions", "This agent's live open positions with unrealized PnL.", { type: "object", properties: {} }),
+        fnTool("place_trade", "Propose an order on this agent's Orderly account (user confirms before it fires). MARKET or LIMIT.", {
+          type: "object",
+          properties: {
+            symbol: { type: "string", description: "e.g. BTC, ETH, SOL" },
+            side: { type: "string", enum: ["long", "short"] },
+            type: { type: "string", enum: ["MARKET", "LIMIT"] },
+            quantity: { type: "number", description: "base-asset quantity" },
+            price: { type: "number", description: "required for LIMIT" },
+            stopLoss: { type: "number", description: "optional, for risk sizing" },
+            reduceOnly: { type: "boolean" },
+          },
+          required: ["symbol", "side", "quantity"],
+        })
+      );
+    } else {
+      capabilities.push("- Orderly/QuickPerps: selected but this agent has NO connected trading account. Tell the user to connect one in Wallet before any trading request.");
+    }
   }
   const notConnected: string[] = [];
   if (mcps.includes("moralis") && !moralisReady()) notConnected.push("Moralis (onchain_data)");
@@ -175,7 +206,31 @@ ${instructions || "(none)"}`;
               send({ type: "tool", name: tc.function.name, args });
               toolsUsed.push({ name: tc.function.name, args });
               let result: any;
-              try { result = await runTool(tc.function.name, args); } catch (e) { result = { error: String(e) }; }
+              try {
+                const tn = tc.function.name;
+                if (tn === "get_account" && orderlyCreds) {
+                  const bal = await new OrderlyClient(orderlyCreds).getBalance();
+                  result = { network: orderlyCreds.network, equity: Number(bal?.total_collateral_value) || 0, freeCollateral: Number(bal?.free_collateral) || 0, holdings: bal?.holding || [] };
+                } else if (tn === "get_positions" && orderlyCreds) {
+                  result = { positions: (await new OrderlyClient(orderlyCreds).getPositions()).filter((p: any) => Number(p.position_qty) !== 0) };
+                } else if (tn === "place_trade") {
+                  // Propose only — risk-check, show the user a confirm card, do NOT execute.
+                  if (!orderlyCreds) result = { proposed: false, reason: "No Orderly account connected for this agent." };
+                  else {
+                    const bal = await new OrderlyClient(orderlyCreds).getBalance().catch(() => null);
+                    const equity = Number(bal?.total_collateral_value) || 0;
+                    const refPrice = args.type === "LIMIT" && args.price ? Number(args.price) : ((await getSnapshot(args.symbol)).markPrice || 0);
+                    const verdict = checkOrder({ price: refPrice, quantity: Number(args.quantity), equityUsd: equity, stopLoss: args.stopLoss ? Number(args.stopLoss) : undefined });
+                    if (!verdict.ok) result = { proposed: false, blockedByRiskEngine: true, violations: verdict.violations };
+                    else {
+                      send({ type: "trade_proposal", proposal: { agentId, symbol: args.symbol, side: args.side, type: args.type || "MARKET", quantity: args.quantity, price: args.price, refPrice, notionalUsd: Math.round(verdict.notionalUsd), network: orderlyCreds.network } });
+                      result = { proposed: true, awaitingUserConfirmation: true, refPrice, notionalUsd: Math.round(verdict.notionalUsd) };
+                    }
+                  }
+                } else {
+                  result = await runTool(tn, args);
+                }
+              } catch (e) { result = { error: String(e) }; }
               // Backtest: push the equity curve to the client for a chart, give the LLM metrics only.
               if (tc.function.name === "backtest_strategy" && result?.equityCurve) {
                 send({ type: "backtest", result });

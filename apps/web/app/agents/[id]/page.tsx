@@ -12,6 +12,7 @@ interface Msg {
   text: string;
   tools?: { name: string; args: any; done?: boolean }[];
   backtest?: any;
+  proposal?: any;
   streaming?: boolean;
 }
 
@@ -48,6 +49,7 @@ export default function AgentChat({ params }: { params: Promise<{ id: string }> 
         if (last?.role !== "agent") return m;
         if (e.type === "tool") last.tools = [...(last.tools ?? []).map(t => ({ ...t, done: true })), { name: e.name, args: e.args }];
         else if (e.type === "backtest") { last.backtest = e.result; last.tools = last.tools?.map(t => ({ ...t, done: true })); }
+        else if (e.type === "trade_proposal") { last.proposal = e.proposal; last.tools = last.tools?.map(t => ({ ...t, done: true })); }
         else if (e.type === "delta") { last.tools = last.tools?.map(t => ({ ...t, done: true })); last.text += e.content; }
         else if (e.type === "error") { last.text += `\n[error] ${e.error}`; last.streaming = false; setBusy(false); }
         else if (e.type === "done") { last.streaming = false; last.tools = last.tools?.map(t => ({ ...t, done: true })); setBusy(false); }
@@ -84,7 +86,7 @@ export default function AgentChat({ params }: { params: Promise<{ id: string }> 
           <div style={{ color: "var(--text-muted)", marginBottom: 18 }}>
             <span style={{ color: "var(--brand)" }}>●</span> {agent?.name ?? "agent"} online — {(agent?.mcps ?? []).length} MCP{(agent?.mcps ?? []).length === 1 ? "" : "s"} connected. Type a command below.
           </div>
-          {messages.map((m, i) => <Line key={i} m={m} />)}
+          {messages.map((m, i) => <Line key={i} m={m} agentId={id} />)}
         </div>
       </div>
 
@@ -105,12 +107,13 @@ export default function AgentChat({ params }: { params: Promise<{ id: string }> 
   );
 }
 
-function Line({ m }: { m: Msg }) {
+function Line({ m, agentId }: { m: Msg; agentId: string }) {
   if (m.role === "user") {
     return <div style={{ marginBottom: 14 }}><span style={{ color: "var(--brand)", fontWeight: 700 }}>❯ </span><span style={{ color: "var(--text)" }}>{m.text}</span></div>;
   }
   return (
     <div style={{ marginBottom: 22 }}>
+      {m.proposal && <TradeProposalCard p={m.proposal} agentId={agentId} />}
       {m.tools?.map((t, i) => (
         <div key={i} style={{ color: "var(--text-2)", marginBottom: 4 }}>
           <span style={{ color: "var(--text-muted)" }}>$ </span>
@@ -125,6 +128,45 @@ function Line({ m }: { m: Msg }) {
         {m.streaming && <span style={{ color: "var(--brand)", animation: "blink 1s step-end infinite" }}>▋</span>}
         {m.streaming && !m.text && <span className="muted">running…</span>}
       </div>
+    </div>
+  );
+}
+
+function TradeProposalCard({ p, agentId }: { p: any; agentId: string }) {
+  const [state, setState] = useState<"idle" | "executing" | "done" | "rejected">("idle");
+  const [result, setResult] = useState<any>(null);
+  const long = p.side === "long";
+
+  async function confirm() {
+    setState("executing");
+    try {
+      const r = await api.orderly.order(agentId, { symbol: p.symbol, side: p.side, type: p.type, quantity: p.quantity, price: p.price });
+      setResult(r); setState("done");
+    } catch (e) { setResult({ error: e instanceof Error ? e.message : "failed" }); setState("done"); }
+  }
+
+  return (
+    <div className="card" style={{ margin: "4px 0 12px", padding: 16, borderColor: "var(--brand-ring)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <span className="badge" style={{ background: long ? "rgba(47,158,111,.12)" : "rgba(209,72,58,.12)", color: long ? "var(--green)" : "var(--red)", border: `1px solid ${long ? "rgba(47,158,111,.3)" : "rgba(209,72,58,.3)"}` }}>{p.side.toUpperCase()}</span>
+        <span style={{ fontWeight: 650 }} className="mono">{p.symbol}</span>
+        <span className="muted mono" style={{ fontSize: 13 }}>{p.type} · {p.quantity} · ~${p.notionalUsd?.toLocaleString()} · {p.network}</span>
+      </div>
+      {state === "idle" && (
+        <div style={{ display: "flex", gap: 10 }}>
+          <button className="btn btn-solid btn-sm" onClick={confirm}>Confirm &amp; place</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setState("rejected")}>Reject</button>
+        </div>
+      )}
+      {state === "executing" && <div className="muted mono" style={{ fontSize: 13 }}><span className="dot-pulse">●</span> placing order…</div>}
+      {state === "rejected" && <div className="muted" style={{ fontSize: 13 }}>Rejected — no order placed.</div>}
+      {state === "done" && (
+        <div style={{ fontSize: 13 }} className="mono">
+          {result?.placed ? <span style={{ color: "var(--green)" }}>✓ Order placed{result.order?.order_id ? ` · #${result.order.order_id}` : ""}</span>
+            : result?.blockedByRiskEngine ? <span style={{ color: "var(--red)" }}>⚠ Blocked by risk engine: {result.violations?.join("; ")}</span>
+            : <span style={{ color: "var(--red)" }}>✕ {result?.error || "Order failed"}</span>}
+        </div>
+      )}
     </div>
   );
 }

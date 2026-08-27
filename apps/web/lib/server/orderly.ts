@@ -99,3 +99,15 @@ export async function onboardOrderly(opts: { baseUrl?: string; chainId?: number;
 
   return { address: account.address, privateKey: pk, accountId, orderlyKey: key.orderlyKey, secretHex: key.secretHex, baseUrl: base };
 }
+
+/** Request testnet USDC collateral for an address's Orderly account. */
+export async function faucetTestnetUsdc(address: string, chainId = 421614, quantity = 1000) {
+  const res = await fetch("https://testnet-operator-evm.orderly.org/v1/faucet/usdc", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ broker_id: BROKER_ID, chain_id: String(chainId), user_address: address, quantity }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const j = (await res.json()) as any;
+  if (!res.ok || j.success === false) throw new Error(`Faucet failed: ${j.message ?? res.status}`);
+  return j;
+}
