@@ -4,6 +4,40 @@
  * Per-bar "risk-on" signal for backtesting: true when total DeFi TVL is higher
  * than ~30 days earlier (capital flowing in). Aligned to the given candles.
  */
+/** As-of lookup helper: last value at or before ms (binary search over sorted [t,v]). */
+function asOf(pts: { t: number; v: number }[], ms: number): number | null {
+  let lo = 0, hi = pts.length - 1, res = -1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (pts[mid].t <= ms) { res = mid; lo = mid + 1; } else hi = mid - 1; }
+  return res >= 0 ? pts[res].v : null;
+}
+
+/**
+ * Macro DeFi factors as candle-aligned series for backtesting: total DeFi TVL,
+ * its 30-day % change, total stablecoin market cap, and its 30-day % change.
+ * Missing data → null series (conditions on it simply won't trigger).
+ */
+export async function macroFactors(candles: { time: number }[]): Promise<Record<string, (number | null)[]>> {
+  const DAY = 864e5;
+  const empty = () => candles.map(() => null);
+  const out: Record<string, (number | null)[]> = { defi_tvl: empty(), defi_tvl_roc30: empty(), stablecoin_mcap: empty(), stablecoin_roc30: empty() };
+
+  try {
+    const raw = (await j("https://api.llama.fi/v2/historicalChainTvl")) as { date: number; tvl: number }[];
+    const pts = raw.map((p) => ({ t: p.date * 1000, v: p.tvl })).sort((a, b) => a.t - b.t);
+    out.defi_tvl = candles.map((c) => asOf(pts, c.time));
+    out.defi_tvl_roc30 = candles.map((c) => { const n = asOf(pts, c.time), p = asOf(pts, c.time - 30 * DAY); return n != null && p ? (n / p - 1) * 100 : null; });
+  } catch {}
+
+  try {
+    const sc = (await j("https://stablecoins.llama.fi/stablecoincharts/all")) as any[];
+    const pts = sc.map((p) => ({ t: Number(p.date) * 1000, v: Number(p.totalCirculatingUSD?.peggedUSD ?? p.totalCirculatingUSD ?? 0) })).filter((p) => p.v > 0).sort((a, b) => a.t - b.t);
+    out.stablecoin_mcap = candles.map((c) => asOf(pts, c.time));
+    out.stablecoin_roc30 = candles.map((c) => { const n = asOf(pts, c.time), p = asOf(pts, c.time - 30 * DAY); return n != null && p ? (n / p - 1) * 100 : null; });
+  } catch {}
+
+  return out;
+}
+
 export async function defiRiskOnSeries(candles: { time: number }[]): Promise<(boolean | null)[]> {
   let pts: { t: number; tvl: number }[];
   try {

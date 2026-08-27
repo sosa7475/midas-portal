@@ -13,7 +13,8 @@ export type IndName =
   | "ema" | "sma" | "rsi" | "atr" | "roc"
   | "macd_line" | "macd_signal" | "macd_hist"
   | "bb_upper" | "bb_mid" | "bb_lower"
-  | "donchian_high" | "donchian_low";
+  | "donchian_high" | "donchian_low"
+  | "defi_tvl" | "defi_tvl_roc30" | "stablecoin_mcap" | "stablecoin_roc30"; // DeFiLlama macro factors
 export interface Operand { ind?: IndName; period?: number; mult?: number; value?: number }
 export type Op = ">" | "<" | ">=" | "<=" | "cross_above" | "cross_below";
 export interface Condition { left: Operand; op: Op; right: Operand }
@@ -80,13 +81,14 @@ function boll(c: number[], p = 20, m = 2) { const mid = sma(c, p); const up: Ser
 function donchian(c: Candle[], p: number) { const hi: Series = [], lo: Series = []; for (let i = 0; i < c.length; i++) { if (i < p) { hi.push(null); lo.push(null); continue; } let h = -Infinity, l = Infinity; for (let j = i - p; j < i; j++) { h = Math.max(h, c[j].high); l = Math.min(l, c[j].low); } hi.push(h); lo.push(l); } return { hi, lo }; }
 
 /** Resolve an operand to a value series, computing (and caching) the needed indicator. */
-function resolver(candles: Candle[]) {
+function resolver(candles: Candle[], factors?: Record<string, Series>) {
   const c = candles.map((x) => x.close);
   const cache = new Map<string, Series>();
   const m = macd(c);
   const get = (op: Operand): Series => {
     if (op.value != null) return candles.map(() => op.value!);
     const ind = op.ind ?? "close";
+    if (factors && factors[ind]) return factors[ind]; // external DeFi macro factors
     const key = `${ind}:${op.period ?? ""}:${op.mult ?? ""}`;
     if (cache.has(key)) return cache.get(key)!;
     let s: Series;
@@ -144,8 +146,8 @@ export interface BacktestResult {
   exposurePct: number; finalEquity: number; equityCurve: number[]; note?: string;
 }
 
-export function runBacktest(candles: Candle[], s: StrategySpec, riskOn?: (boolean | null)[]): BacktestResult {
-  const res = resolver(candles);
+export function runBacktest(candles: Candle[], s: StrategySpec, riskOn?: (boolean | null)[], factors?: Record<string, Series>): BacktestResult {
+  const res = resolver(candles, factors);
   const atr14 = atr(candles, 14);
   const fee = (s.feeBps ?? 5) / 10000, slip = (s.slippageBps ?? 2) / 10000;
   const start = 10000;

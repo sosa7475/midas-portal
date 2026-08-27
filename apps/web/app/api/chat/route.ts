@@ -4,7 +4,7 @@ import { getSession } from "../../../lib/server/auth";
 import { query } from "../../../lib/server/db";
 import { ensureAgentsTable, loadAgentMessages, saveAgentMessage } from "../../../lib/server/agents-sql";
 import { getCandles, getSnapshot, normalizeSymbol, summarize } from "../../../lib/server/market";
-import { defiData, defiRiskOnSeries } from "../../../lib/server/defi";
+import { defiData, defiRiskOnSeries, macroFactors } from "../../../lib/server/defi";
 import { onchain, moralisReady } from "../../../lib/server/moralis";
 import { openseaSearch, openseaCollection, openseaTrending, openseaWallet, openseaReady } from "../../../lib/server/opensea";
 import { fetchHistory, runBacktest } from "../../../lib/server/backtest";
@@ -26,7 +26,7 @@ const OP = { type: "string", enum: [">", "<", ">=", "<=", "cross_above", "cross_
 const OPERAND = {
   type: "object",
   properties: {
-    ind: { type: "string", enum: ["close", "open", "high", "low", "volume", "ema", "sma", "rsi", "atr", "roc", "macd_line", "macd_signal", "macd_hist", "bb_upper", "bb_mid", "bb_lower", "donchian_high", "donchian_low"] },
+    ind: { type: "string", enum: ["close", "open", "high", "low", "volume", "ema", "sma", "rsi", "atr", "roc", "macd_line", "macd_signal", "macd_hist", "bb_upper", "bb_mid", "bb_lower", "donchian_high", "donchian_low", "defi_tvl", "defi_tvl_roc30", "stablecoin_mcap", "stablecoin_roc30"] },
     period: { type: "number" }, mult: { type: "number" }, value: { type: "number" },
   },
 };
@@ -37,7 +37,7 @@ const MCP_REGISTRY: Record<string, { capability: string; tools: Tool[] }> = {
     capability: "Technical Analysis (tools: analyze_market, backtest_strategy) — live indicators PLUS a robust multi-year backtester. When asked to backtest, translate YOUR OWN strategy (from your creator instructions) faithfully into entry/exit CONDITIONS and run it. Report Sharpe, max drawdown, win rate, CAGR, profit factor. Be honest about overfitting.",
     tools: [
       fnTool("analyze_market", "Live market snapshot + indicators (RSI, EMA, MACD, ATR, funding, OI) for a perp symbol like BTC, ETH, SOL.", { type: "object", properties: { symbol: { type: "string" }, interval: { type: "string", enum: ["15m", "1h", "4h", "1d"] } }, required: ["symbol"] }),
-      fnTool("backtest_strategy", "Backtest a strategy over years of real history using an expressive condition engine. Express the strategy as entry/exit CONDITIONS. An OPERAND is {ind, period, mult} or {value}. ind ∈ close/open/high/low/volume/ema/sma/rsi/atr/roc/macd_line/macd_signal/macd_hist/bb_upper/bb_mid/bb_lower/donchian_high/donchian_low. A CONDITION is {left:OPERAND, op, right:OPERAND}, op ∈ >,<,>=,<=,cross_above,cross_below. entryLong/entryShort/exitLong/exitShort are arrays of conditions (ALL must hold = AND). Examples: EMA20>EMA50 = {left:{ind:'ema',period:20},op:'>',right:{ind:'ema',period:50}}; RSI<30 = {left:{ind:'rsi',period:14},op:'<',right:{value:30}}; breakout = {left:{ind:'close'},op:'cross_above',right:{ind:'donchian_high',period:20}}. Returns Sharpe/maxDD/winRate/CAGR/PF/equity curve.", {
+      fnTool("backtest_strategy", "Backtest a strategy over years of real history using an expressive condition engine. Express the strategy as entry/exit CONDITIONS. An OPERAND is {ind, period, mult} or {value}. ind ∈ close/open/high/low/volume/ema/sma/rsi/atr/roc/macd_line/macd_signal/macd_hist/bb_upper/bb_mid/bb_lower/donchian_high/donchian_low. A CONDITION is {left:OPERAND, op, right:OPERAND}, op ∈ >,<,>=,<=,cross_above,cross_below. entryLong/entryShort/exitLong/exitShort are arrays of conditions (ALL must hold = AND). Examples: EMA20>EMA50 = {left:{ind:'ema',period:20},op:'>',right:{ind:'ema',period:50}}; RSI<30 = {left:{ind:'rsi',period:14},op:'<',right:{value:30}}; breakout = {left:{ind:'close'},op:'cross_above',right:{ind:'donchian_high',period:20}}. You can ALSO use DeFi macro factors as historical filters: defi_tvl_roc30 (30d % change in total DeFi TVL) and stablecoin_roc30 (30d % change in stablecoin supply) — e.g. only go long when capital is flowing in: {left:{ind:'defi_tvl_roc30'},op:'>',right:{value:0}}. Returns Sharpe/maxDD/winRate/CAGR/PF/equity curve.", {
         type: "object",
         properties: {
           symbol: { type: "string", description: "e.g. BTC, ETH, SOL" },
@@ -112,8 +112,12 @@ async function runTool(name: string, args: any) {
     const years = Math.min(Math.max(args.years || 3, 0.25), 10);
     const candles = await fetchHistory(args.symbol, args.interval, years);
     if (candles.length < 60) return { error: `Not enough history for ${args.symbol} ${args.interval}` };
+    // Only fetch DeFi macro factors if the strategy actually references them.
+    const usesFactors = ["entryLong", "entryShort", "exitLong", "exitShort"].some((k) =>
+      (args[k] || []).some((cnd: any) => [cnd?.left?.ind, cnd?.right?.ind].some((x) => typeof x === "string" && (x.startsWith("defi_") || x.startsWith("stablecoin_")))));
+    const factors = usesFactors ? await macroFactors(candles) : undefined;
     const riskOn = args.defiTrendFilter ? await defiRiskOnSeries(candles) : undefined;
-    return runBacktest(candles, { ...args, years }, riskOn);
+    return runBacktest(candles, { ...args, years }, riskOn, factors);
   }
   return { error: "unknown tool" };
 }
