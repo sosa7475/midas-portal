@@ -53,6 +53,7 @@ export const api = {
   agents: {
     list: () => req("GET", "/api/agents"),
     get: (id: string) => req("GET", `/api/agents/${id}`),
+    messages: (id: string) => req("GET", `/api/agents/${id}/messages`),
     create: (a: { name: string; instructions: string; mcps: string[] }) => req("POST", "/api/agents", a),
     remove: (id: string) => req("DELETE", `/api/agents/${id}`),
   },

@@ -16,8 +16,36 @@ export async function ensureAgentsTable() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_agents_user ON agents(user_id);
+    CREATE TABLE IF NOT EXISTS agent_messages (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      role VARCHAR(20) NOT NULL,
+      content TEXT NOT NULL,
+      tools JSONB,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_messages ON agent_messages(user_id, agent_id, created_at);
   `);
   ensured = true;
+}
+
+export interface StoredMessage { role: "user" | "assistant"; content: string; tools?: any }
+
+/** Load recent conversation for an agent, oldest-first. */
+export async function loadAgentMessages(userId: string, agentId: string, limit = 30): Promise<StoredMessage[]> {
+  const r = await query<{ role: "user" | "assistant"; content: string; tools: any }>(
+    "SELECT role, content, tools FROM agent_messages WHERE user_id = $1 AND agent_id = $2 ORDER BY created_at DESC LIMIT $3",
+    [userId, agentId, limit]
+  );
+  return r.rows.reverse().map((m) => ({ role: m.role, content: m.content, tools: m.tools ?? undefined }));
+}
+
+export async function saveAgentMessage(userId: string, agentId: string, role: "user" | "assistant", content: string, tools?: any) {
+  await query(
+    "INSERT INTO agent_messages (user_id, agent_id, role, content, tools) VALUES ($1,$2,$3,$4,$5)",
+    [userId, agentId, role, content, tools ? JSON.stringify(tools) : null]
+  );
 }
 
 export interface AgentRow {

@@ -24,7 +24,14 @@ export default function AgentChat({ params }: { params: Promise<{ id: string }> 
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { if (ready) api.agents.get(id).then((r) => setAgent(r.agent)).catch(() => setAgent(false)); }, [ready, id]);
+  useEffect(() => {
+    if (!ready) return;
+    api.agents.get(id).then((r) => setAgent(r.agent)).catch(() => setAgent(false));
+    // Load persistent conversation memory.
+    api.agents.messages(id).then((r) => {
+      setMessages((r.messages ?? []).map((m: any) => ({ role: m.role === "user" ? "user" : "agent", text: m.content, tools: m.tools })));
+    }).catch(() => {});
+  }, [ready, id]);
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages]);
 
   if (!ready) return null;

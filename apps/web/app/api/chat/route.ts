@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { getSession } from "../../../lib/server/auth";
 import { query } from "../../../lib/server/db";
-import { ensureAgentsTable } from "../../../lib/server/agents-sql";
+import { ensureAgentsTable, loadAgentMessages, saveAgentMessage } from "../../../lib/server/agents-sql";
 import { getCandles, getSnapshot, normalizeSymbol, summarize } from "../../../lib/server/market";
 import { defiData, defiRiskOnSeries } from "../../../lib/server/defi";
 import { onchain, moralisReady } from "../../../lib/server/moralis";
@@ -114,10 +114,14 @@ export async function POST(req: NextRequest) {
   let mcps: string[] = ["technical-analysis"];
   let agentName = "Midas";
   let instructions = "";
-  if (agentId && session) {
+  let history: { role: "user" | "assistant"; content: string }[] = [];
+  const persist = !!(agentId && session);
+  if (persist) {
     await ensureAgentsTable();
-    const r = await query<any>("SELECT name, instructions, mcps FROM agents WHERE id = $1 AND user_id = $2", [agentId, session.userId]);
+    const r = await query<any>("SELECT name, instructions, mcps FROM agents WHERE id = $1 AND user_id = $2", [agentId, session!.userId]);
     if (r.rows[0]) { agentName = r.rows[0].name; mcps = r.rows[0].mcps ?? []; instructions = r.rows[0].instructions || ""; }
+    // Persistent memory: replay this agent's prior conversation.
+    history = (await loadAgentMessages(session!.userId, agentId!, 30)).map((m) => ({ role: m.role, content: m.content }));
   }
 
   // Build tools + a capability manifest from the agent's connected MCPs.
@@ -151,8 +155,10 @@ ${instructions || "(none)"}`;
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: system },
+    ...history.map((h) => ({ role: h.role, content: h.content }) as OpenAI.Chat.Completions.ChatCompletionMessageParam),
     { role: "user", content: message },
   ];
+  const toolsUsed: { name: string; args: any }[] = [];
 
   const enc = new TextEncoder();
   const stream = new ReadableStream({
@@ -167,6 +173,7 @@ ${instructions || "(none)"}`;
             for (const tc of c.message.tool_calls) {
               const args = JSON.parse(tc.function.arguments || "{}");
               send({ type: "tool", name: tc.function.name, args });
+              toolsUsed.push({ name: tc.function.name, args });
               let result: any;
               try { result = await runTool(tc.function.name, args); } catch (e) { result = { error: String(e) }; }
               // Backtest: push the equity curve to the client for a chart, give the LLM metrics only.
@@ -182,11 +189,17 @@ ${instructions || "(none)"}`;
           break;
         }
         const finalStream = await client.chat.completions.create({ model, messages, stream: true });
+        let finalText = "";
         for await (const chunk of finalStream) {
           const d = chunk.choices[0]?.delta?.content;
-          if (d) send({ type: "delta", content: d });
+          if (d) { finalText += d; send({ type: "delta", content: d }); }
         }
         send({ type: "done" });
+        // Persist the turn so the agent remembers next time.
+        if (persist) {
+          await saveAgentMessage(session!.userId, agentId!, "user", message).catch(() => {});
+          await saveAgentMessage(session!.userId, agentId!, "assistant", finalText, toolsUsed.length ? toolsUsed : undefined).catch(() => {});
+        }
       } catch (e) {
         send({ type: "error", error: e instanceof Error ? e.message : "chat failed" });
       } finally {
