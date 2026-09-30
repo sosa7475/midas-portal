@@ -1,14 +1,23 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const { validateSessionConfig, sessionToken } = require('../services/session-token');
 const { query } = require('../db/client');
 
 const router = express.Router();
 
 router.post('/register', async (req, res) => {
-  const { email, password, displayName } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  const { email, password, displayName } = req.body || {};
+  if (typeof email !== 'string' || !email.trim() || email.length > 255 ||
+      typeof password !== 'string' || !password || password.length > 4096) {
+    return res.status(400).json({ error: 'Valid email and password required' });
+  }
+  try { validateSessionConfig(); }
+  catch { return res.status(503).json({ error: 'Authentication temporarily unavailable' }); }
+
+  if (Buffer.byteLength(password, 'utf8') > 72 ||
+      (displayName != null && (typeof displayName !== 'string' || displayName.length > 100))) {
+    return res.status(400).json({ error: 'Password exceeds 72 bytes or display name is invalid' });
+  }
 
   try {
     const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
@@ -20,7 +29,7 @@ router.post('/register', async (req, res) => {
       [email.toLowerCase(), passwordHash, displayName || null]
     );
     const user = result.rows[0];
-    const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+    const token = sessionToken(user);
 
     res.status(201).json({ token, user: { id: user.id, email: user.email, displayName: user.display_name } });
   } catch (err) {
@@ -30,8 +39,13 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  const { email, password } = req.body || {};
+  if (typeof email !== 'string' || !email.trim() || email.length > 255 ||
+      typeof password !== 'string' || !password || password.length > 4096) {
+    return res.status(400).json({ error: 'Valid email and password required' });
+  }
+  try { validateSessionConfig(); }
+  catch { return res.status(503).json({ error: 'Authentication temporarily unavailable' }); }
 
   try {
     const result = await query('SELECT id, email, password_hash, display_name FROM users WHERE email = $1', [email.toLowerCase()]);
@@ -41,7 +55,7 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+    const token = sessionToken(user);
     res.json({ token, user: { id: user.id, email: user.email, displayName: user.display_name } });
   } catch (err) {
     console.error('Login error:', err);

@@ -2,6 +2,8 @@ const express = require('express');
 const { authenticate } = require('../middleware/auth');
 const { query } = require('../db/client');
 const orderly = require('../services/orderly');
+const { validateTradeInput } = require('../services/trade-input');
+const { journalStatus } = require('../services/trade-status');
 const { getUserOrderlyCreds } = require('./wallet');
 
 const router = express.Router();
@@ -9,13 +11,24 @@ router.use(authenticate);
 
 // Confirm and execute a trade
 router.post('/confirm', async (req, res) => {
-  const { pair, side, size, entry, stopLoss, takeProfit, orderType = 'MARKET', strategyId, screenshotUrl, agentReasoning } = req.body;
-
-  if (!pair || !side || !size) {
-    return res.status(400).json({ error: 'pair, side, and size are required' });
+  let input;
+  try {
+    input = validateTradeInput(req.body);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
   }
+  const { pair, side, size, entry, stopLoss, takeProfit, orderType, strategyId, screenshotUrl, agentReasoning } = input;
 
   try {
+    // A supplied strategy must belong to the acting user before any order is sent.
+    if (strategyId != null && strategyId !== '') {
+      if (typeof strategyId !== 'string' ||
+          !/^[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$/.test(strategyId)) {
+        return res.status(400).json({ error: 'Invalid strategy ID' });
+      }
+      const strategy = await query('SELECT id FROM strategies WHERE id = $1 AND user_id = $2', [strategyId, req.user.userId]);
+      if (!strategy.rows.length) return res.status(404).json({ error: 'Strategy not found' });
+    }
     const creds = await getUserOrderlyCreds(req.user.userId);
     if (!creds) return res.status(400).json({ error: 'No Orderly credentials. Connect your wallet first.' });
 
@@ -25,11 +38,11 @@ router.post('/confirm', async (req, res) => {
       apiSecret: creds.apiSecret,
       pair,
       side,
-      size: parseFloat(size),
+      size,
       orderType,
-      price: entry ? parseFloat(entry) : null,
-      stopLoss: stopLoss ? parseFloat(stopLoss) : null,
-      takeProfit: takeProfit ? parseFloat(takeProfit) : null,
+      price: entry,
+      stopLoss,
+      takeProfit,
     });
 
     // Log to journal
@@ -47,7 +60,7 @@ router.post('/confirm', async (req, res) => {
         stopLoss || null,
         takeProfit || null,
         execution.orderId,
-        execution.status,
+        journalStatus(execution.status) || 'pending',
         screenshotUrl || null,
         agentReasoning || null,
       ]
@@ -67,7 +80,7 @@ router.get('/history', async (req, res) => {
     const result = await query(
       `SELECT t.*, s.name as strategy_name
        FROM trades t
-       LEFT JOIN strategies s ON t.strategy_id = s.id
+       LEFT JOIN strategies s ON t.strategy_id = s.id AND s.user_id = t.user_id
        WHERE t.user_id = $1
        ORDER BY t.created_at DESC
        LIMIT $2 OFFSET $3`,
@@ -91,14 +104,15 @@ router.get('/:tradeId', async (req, res) => {
     const trade = result.rows[0];
 
     // If order is still pending, check Orderly for update
-    if (trade.order_id && trade.status === 'confirmed') {
+    if (trade.order_id && ['pending', 'confirmed'].includes(trade.status)) {
       try {
         const creds = await getUserOrderlyCreds(req.user.userId);
         if (creds) {
           const orderStatus = await orderly.getOrderStatus({ apiKey: creds.apiKey, apiSecret: creds.apiSecret, orderId: trade.order_id });
-          if (orderStatus?.status && orderStatus.status !== trade.status) {
-            await query('UPDATE trades SET status = $1, updated_at = NOW() WHERE id = $2', [orderStatus.status.toLowerCase(), trade.id]);
-            trade.status = orderStatus.status.toLowerCase();
+          const status = journalStatus(orderStatus?.status);
+          if (status && status !== trade.status) {
+            await query('UPDATE trades SET status = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3', [status, trade.id, req.user.userId]);
+            trade.status = status;
           }
         }
       } catch {
