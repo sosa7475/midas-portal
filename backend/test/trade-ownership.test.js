@@ -11,6 +11,7 @@ function harness(owned = true) {
   if(process.env.SECURITY_BASELINE_REF)source=require('node:child_process').execFileSync('git',['show',`${process.env.SECURITY_BASELINE_REF}:backend/src/routes/trade.js`],{encoding:'utf8'});
   vm.runInNewContext(source,{module,console:{error(){}},require(name){
     if(name==='express')return express;
+    if(name==='../services/trade-status')return require('../src/services/trade-status');
     if(name==='../services/trade-input')return require('../src/services/trade-input');
     if(name==='../middleware/auth')return {authenticate:(_req,_res,next)=>next()};
     if(name==='./wallet')return {getUserOrderlyCreds:async user=>{state.credentials.push(user);return {apiKey:'fake-key',apiSecret:'fake-secret'};}};
@@ -32,6 +33,7 @@ test('foreign or missing strategies are refused before credential lookup or orde
 });
 test('owned strategies and unlinked orders retain the normal execution and journal response',async()=>{
   const h=harness();for(const body of [order,{...order,strategyId}]){const res=await h.request('post','/confirm',body);assert.equal(res.statusCode,200);assert.equal(res.body.execution.orderId,'fake-order');}
+  assert.equal(h.state.queries.filter(q=>q.sql.includes('INSERT INTO trades')).every(q=>q.params[9]==='pending'),true);
   assert.equal(h.state.orders.length,2);assert.equal(h.state.orders[0].size,0.01);assert.equal(h.state.orders[0].apiKey,'fake-key');
 });
 test('malformed strategy IDs are rejected and historical joins cannot expose another user strategy name',async()=>{

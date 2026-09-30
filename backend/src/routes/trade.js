@@ -3,6 +3,7 @@ const { authenticate } = require('../middleware/auth');
 const { query } = require('../db/client');
 const orderly = require('../services/orderly');
 const { validateTradeInput } = require('../services/trade-input');
+const { journalStatus } = require('../services/trade-status');
 const { getUserOrderlyCreds } = require('./wallet');
 
 const router = express.Router();
@@ -59,7 +60,7 @@ router.post('/confirm', async (req, res) => {
         stopLoss || null,
         takeProfit || null,
         execution.orderId,
-        execution.status,
+        journalStatus(execution.status) || 'pending',
         screenshotUrl || null,
         agentReasoning || null,
       ]
@@ -103,14 +104,15 @@ router.get('/:tradeId', async (req, res) => {
     const trade = result.rows[0];
 
     // If order is still pending, check Orderly for update
-    if (trade.order_id && trade.status === 'confirmed') {
+    if (trade.order_id && ['pending', 'confirmed'].includes(trade.status)) {
       try {
         const creds = await getUserOrderlyCreds(req.user.userId);
         if (creds) {
           const orderStatus = await orderly.getOrderStatus({ apiKey: creds.apiKey, apiSecret: creds.apiSecret, orderId: trade.order_id });
-          if (orderStatus?.status && orderStatus.status !== trade.status) {
-            await query('UPDATE trades SET status = $1, updated_at = NOW() WHERE id = $2', [orderStatus.status.toLowerCase(), trade.id]);
-            trade.status = orderStatus.status.toLowerCase();
+          const status = journalStatus(orderStatus?.status);
+          if (status && status !== trade.status) {
+            await query('UPDATE trades SET status = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3', [status, trade.id, req.user.userId]);
+            trade.status = status;
           }
         }
       } catch {
