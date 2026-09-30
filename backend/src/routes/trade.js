@@ -9,13 +9,22 @@ router.use(authenticate);
 
 // Confirm and execute a trade
 router.post('/confirm', async (req, res) => {
-  const { pair, side, size, entry, stopLoss, takeProfit, orderType = 'MARKET', strategyId, screenshotUrl, agentReasoning } = req.body;
+  const { pair, side, size, entry, stopLoss, takeProfit, orderType = 'MARKET', strategyId, screenshotUrl, agentReasoning } = req.body || {};
 
   if (!pair || !side || !size) {
     return res.status(400).json({ error: 'pair, side, and size are required' });
   }
 
   try {
+    // A supplied strategy must belong to the acting user before any order is sent.
+    if (strategyId != null && strategyId !== '') {
+      if (typeof strategyId !== 'string' ||
+          !/^[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$/.test(strategyId)) {
+        return res.status(400).json({ error: 'Invalid strategy ID' });
+      }
+      const strategy = await query('SELECT id FROM strategies WHERE id = $1 AND user_id = $2', [strategyId, req.user.userId]);
+      if (!strategy.rows.length) return res.status(404).json({ error: 'Strategy not found' });
+    }
     const creds = await getUserOrderlyCreds(req.user.userId);
     if (!creds) return res.status(400).json({ error: 'No Orderly credentials. Connect your wallet first.' });
 
@@ -67,7 +76,7 @@ router.get('/history', async (req, res) => {
     const result = await query(
       `SELECT t.*, s.name as strategy_name
        FROM trades t
-       LEFT JOIN strategies s ON t.strategy_id = s.id
+       LEFT JOIN strategies s ON t.strategy_id = s.id AND s.user_id = t.user_id
        WHERE t.user_id = $1
        ORDER BY t.created_at DESC
        LIMIT $2 OFFSET $3`,
