@@ -2,6 +2,7 @@ const express = require('express');
 const { authenticate } = require('../middleware/auth');
 const { query } = require('../db/client');
 const orderly = require('../services/orderly');
+const { validateTradeInput } = require('../services/trade-input');
 const { getUserOrderlyCreds } = require('./wallet');
 
 const router = express.Router();
@@ -9,11 +10,13 @@ router.use(authenticate);
 
 // Confirm and execute a trade
 router.post('/confirm', async (req, res) => {
-  const { pair, side, size, entry, stopLoss, takeProfit, orderType = 'MARKET', strategyId, screenshotUrl, agentReasoning } = req.body || {};
-
-  if (!pair || !side || !size) {
-    return res.status(400).json({ error: 'pair, side, and size are required' });
+  let input;
+  try {
+    input = validateTradeInput(req.body);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
   }
+  const { pair, side, size, entry, stopLoss, takeProfit, orderType, strategyId, screenshotUrl, agentReasoning } = input;
 
   try {
     // A supplied strategy must belong to the acting user before any order is sent.
@@ -34,11 +37,11 @@ router.post('/confirm', async (req, res) => {
       apiSecret: creds.apiSecret,
       pair,
       side,
-      size: parseFloat(size),
+      size,
       orderType,
-      price: entry ? parseFloat(entry) : null,
-      stopLoss: stopLoss ? parseFloat(stopLoss) : null,
-      takeProfit: takeProfit ? parseFloat(takeProfit) : null,
+      price: entry,
+      stopLoss,
+      takeProfit,
     });
 
     // Log to journal
