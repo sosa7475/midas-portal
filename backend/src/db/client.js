@@ -1,14 +1,14 @@
 const { Pool } = require('pg');
+const { databaseConfig } = require('./config');
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ...databaseConfig(process.env),
   max: 10,
   idleTimeoutMillis: 30000,
 });
 
 pool.on('error', (err) => {
-  console.error('Database pool error:', err);
+  console.error('Database pool error');
 });
 
 async function query(text, params) {
