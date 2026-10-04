@@ -53,3 +53,8 @@ DROP INDEX IF EXISTS execution_one_inflight_account;
 CREATE UNIQUE INDEX execution_one_inflight_account ON execution_orders(account_key)
  WHERE status IN ('submitting','unknown') OR (kind='swap' AND status IN ('submitted','review_required'));
 ALTER TABLE mcp_tokens ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS agent_risk (
+ user_id UUID NOT NULL,agent_id UUID NOT NULL,config JSONB NOT NULL DEFAULT '{}',
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,agent_id)
+);

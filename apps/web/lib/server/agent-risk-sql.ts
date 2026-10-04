@@ -27,27 +27,13 @@ export const RISK_DEFAULTS: RiskConfig = {
   dailyLossLimitUsd: null,
 };
 
-let ensured = false;
-async function ensure() {
-  if (ensured) return;
-  await query(`CREATE TABLE IF NOT EXISTS agent_risk (
-    user_id UUID NOT NULL,
-    agent_id UUID NOT NULL,
-    config JSONB NOT NULL DEFAULT '{}',
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    PRIMARY KEY (user_id, agent_id)
-  )`);
-  ensured = true;
-}
-
+// Risk storage is provisioned by the control migration, never by concurrent requests.
 export async function getRisk(userId: string, agentId: string): Promise<RiskConfig> {
-  await ensure();
   const r = await query<any>("SELECT config FROM agent_risk WHERE user_id=$1 AND agent_id=$2", [userId, agentId]);
   return { ...RISK_DEFAULTS, ...(r.rows[0]?.config ?? {}) };
 }
 
 export async function setRisk(userId: string, agentId: string, patch: Partial<RiskConfig>): Promise<RiskConfig> {
-  await ensure();
   const cur = await getRisk(userId, agentId);
   const next: RiskConfig = { ...cur, ...patch };
   await query(
