@@ -1,0 +1,1217 @@
+{
+  "version": "2.0.0",
+  "catalogHash": "65e5480a126a697e5620e08a1cc0bc645a532781e2b3570874f0043f0a808959",
+  "tools": [
+    {
+      "name": "get_open_orders",
+      "description": "Read live Hyperliquid orders including protective triggers.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "propose_position_action",
+      "description": "Prepare a reduce-only close, cancellation or native stop/target protection for an existing Hyperliquid position. Owner reviews exact action in Trading control.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "close",
+              "cancel",
+              "protection"
+            ]
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Market symbol"
+          },
+          "orderId": {
+            "type": "integer"
+          },
+          "stopLoss": {
+            "type": "number"
+          },
+          "takeProfit": {
+            "type": "number"
+          },
+          "requestKey": {
+            "type": "string",
+            "description": "Stable retry key"
+          }
+        },
+        "required": [
+          "action",
+          "symbol"
+        ]
+      }
+    },
+    {
+      "name": "execute_order",
+      "description": "Execute an approved position-management proposal; the server verifies owner approval or a scoped mandate.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "type": "string",
+            "description": "Stored proposal ID"
+          }
+        },
+        "required": [
+          "intent"
+        ]
+      }
+    },
+    {
+      "name": "get_capabilities",
+      "description": "Supported venues, execution and account connection requirements, including Robinhood Chain.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_chain_wallet",
+      "description": "Read agent balances and tracked tokens on Base or Robinhood Chain. No transfers or provisioning.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": "string",
+            "enum": [
+              "base",
+              "robinhood"
+            ]
+          },
+          "tokenAddresses": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "list_orders",
+      "description": "Durable order lifecycle, approval and transaction status for this agent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_mandate",
+      "description": "Read the owner's autonomous trading mandate. Agents cannot change it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_spot_exits",
+      "description": "Owner-authorized deterministic spot exit rules and failures. Configure in Trading control.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_readiness",
+      "description": "Check credentials, account connection, strategy eligibility, worker health and unresolved orders before trading.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_alerts",
+      "description": "Read operational alerts and worker heartbeats for this agent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_accounting",
+      "description": "Verified Midas fill ledger, FIFO realized amounts by quote token, separate network fees and explicit unmatched history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "analyze_market",
+      "description": "Live perp snapshot + indicators (RSI/EMA/MACD/ATR/funding/OI) for a symbol (BTC, ETH, SOL). Returns available:false for symbols with no perp — then use dex_analytics/hood_chain.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "e.g. BTC"
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ]
+          }
+        },
+        "required": [
+          "symbol"
+        ]
+      }
+    },
+    {
+      "name": "dex_analytics",
+      "description": "On-chain DEX data (GeckoTerminal) for ANY token by contract on 250+ chains incl base, solana, robinhood (Hood Chain). kind: token (price/mcap) | pools (liquidity) | ohlcv (candles) | search (find by name) | trending | new_pools (fresh launches) | top_pools | trades (recent swaps / buy-sell flow for a pool) | token_info (socials + GT trust score).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "token",
+              "pools",
+              "ohlcv",
+              "search",
+              "trending",
+              "new_pools",
+              "top_pools",
+              "trades",
+              "token_info"
+            ]
+          },
+          "network": {
+            "type": "string",
+            "description": "base, solana, eth, arbitrum, robinhood"
+          },
+          "address": {
+            "type": "string",
+            "description": "token contract"
+          },
+          "pool": {
+            "type": "string",
+            "description": "pool address for ohlcv/trades"
+          },
+          "query": {
+            "type": "string",
+            "description": "search text"
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ]
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      }
+    },
+    {
+      "name": "hood_chain",
+      "description": "Robinhood Chain tokenized stocks (official): kind=assets|price|corporate_actions. symbol e.g. AAPL, NVDA, HOOD.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "assets",
+              "price",
+              "corporate_actions"
+            ]
+          },
+          "symbol": {
+            "type": "string",
+            "description": "ticker"
+          },
+          "query": {
+            "type": "string",
+            "description": "search"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      }
+    },
+    {
+      "name": "rwa_perp",
+      "description": "Ostium RWA/equity perp prices (HOOD, NVDA, TSLA, gold, FX, indices). kind=quote|markets.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "quote",
+              "markets"
+            ]
+          },
+          "symbol": {
+            "type": "string",
+            "description": "e.g. HOOD"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "commodity",
+              "index",
+              "fx",
+              "crypto"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      }
+    },
+    {
+      "name": "onchain_data",
+      "description": "Moralis wallet/token analytics. kind: token_price|token_metadata|token_analytics|token_holders|wallet_tokens|wallet_networth. address = 0x contract or symbol; chain defaults eth.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "token_price",
+              "token_metadata",
+              "token_analytics",
+              "token_holders",
+              "wallet_tokens",
+              "wallet_networth"
+            ]
+          },
+          "address": {
+            "type": "string",
+            "description": "0x or symbol/wallet"
+          },
+          "chain": {
+            "type": "string",
+            "description": "eth/base/…"
+          }
+        },
+        "required": [
+          "kind",
+          "address"
+        ]
+      }
+    },
+    {
+      "name": "defi_data",
+      "description": "DeFiLlama. kind=protocol|yields|chains.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "protocol",
+              "yields",
+              "chains"
+            ]
+          },
+          "query": {
+            "type": "string",
+            "description": "slug/symbol/chain"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      }
+    },
+    {
+      "name": "stock_data",
+      "description": "Underlying US equity data (Finnhub). kind=quote|profile|metrics. symbol e.g. AAPL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "quote",
+              "profile",
+              "metrics"
+            ]
+          },
+          "symbol": {
+            "type": "string",
+            "description": "ticker"
+          }
+        },
+        "required": [
+          "kind",
+          "symbol"
+        ]
+      }
+    },
+    {
+      "name": "backtest_strategy",
+      "description": "Backtest a strategy over history. OKX spot-price proxy by default (symbol), not perpetual execution or funding; OR on-chain token by passing network + address (base/solana/robinhood). Conditions: entryLong/entryShort/exitLong/exitShort = arrays of {left,op,right} where operand={ind,period,mult} or {value}; ind∈close/open/high/low/volume/ema/sma/rsi/atr/roc/macd_line/macd_signal/macd_hist/bb_upper/bb_mid/bb_lower/donchian_high/donchian_low; op∈>,<,>=,<=,cross_above,cross_below. Stops: stopLossAtr/stopLossPct; targets: takeProfitR/takeProfitPct; trailAtr; riskPct; maxHoldingBars; maxLeverage (default 1); feeBps and slippageBps per side; fixedCostUsdPerFill adds a constant USD network cost on entry and exit (default 0, not historical gas). Optional endTime (UTC milliseconds) freezes history, initialEquity sets simulated capital, includeTrades returns the simulated trade ledger.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "BTC or token label"
+          },
+          "network": {
+            "type": "string",
+            "description": "on-chain: base/solana/robinhood/eth/arbitrum"
+          },
+          "address": {
+            "type": "string",
+            "description": "token contract for on-chain"
+          },
+          "pool": {
+            "type": "string",
+            "description": "optional pool"
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ]
+          },
+          "years": {
+            "type": "number"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "long",
+              "short",
+              "both"
+            ]
+          },
+          "entryLong": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "object",
+                  "properties": {
+                    "ind": {
+                      "type": "string",
+                      "enum": [
+                        "close",
+                        "open",
+                        "high",
+                        "low",
+                        "volume",
+                        "ema",
+                        "sma",
+                        "rsi",
+                        "atr",
+                        "roc",
+                        "macd_line",
+                        "macd_signal",
+                        "macd_hist",
+                        "bb_upper",
+                        "bb_mid",
+                        "bb_lower",
+                        "donchian_high",
+                        "donchian_low"
+                      ]
+                    },
+                    "period": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "mult": {
+                      "type": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    ">",
+                    "<",
+                    ">=",
+                    "<=",
+                    "cross_above",
+                    "cross_below"
+                  ]
+                },
+                "right": {
+                  "type": "object",
+                  "properties": {
+                    "ind": {
+                      "type": "string",
+                      "enum": [
+                        "close",
+                        "open",
+                        "high",
+                        "low",
+                        "volume",
+                        "ema",
+                        "sma",
+                        "rsi",
+                        "atr",
+                        "roc",
+                        "macd_line",
+                        "macd_signal",
+                        "macd_hist",
+                        "bb_upper",
+                        "bb_mid",
+                        "bb_lower",
+                        "donchian_high",
+                        "donchian_low"
+                      ]
+                    },
+                    "period": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "mult": {
+                      "type": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "left",
+                "op",
+                "right"
+              ]
+            }
+          },
+          "entryShort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "object",
+                  "properties": {
+                    "ind": {
+                      "type": "string",
+                      "enum": [
+                        "close",
+                        "open",
+                        "high",
+                        "low",
+                        "volume",
+                        "ema",
+                        "sma",
+                        "rsi",
+                        "atr",
+                        "roc",
+                        "macd_line",
+                        "macd_signal",
+                        "macd_hist",
+                        "bb_upper",
+                        "bb_mid",
+                        "bb_lower",
+                        "donchian_high",
+                        "donchian_low"
+                      ]
+                    },
+                    "period": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "mult": {
+                      "type": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    ">",
+                    "<",
+                    ">=",
+                    "<=",
+                    "cross_above",
+                    "cross_below"
+                  ]
+                },
+                "right": {
+                  "type": "object",
+                  "properties": {
+                    "ind": {
+                      "type": "string",
+                      "enum": [
+                        "close",
+                        "open",
+                        "high",
+                        "low",
+                        "volume",
+                        "ema",
+                        "sma",
+                        "rsi",
+                        "atr",
+                        "roc",
+                        "macd_line",
+                        "macd_signal",
+                        "macd_hist",
+                        "bb_upper",
+                        "bb_mid",
+                        "bb_lower",
+                        "donchian_high",
+                        "donchian_low"
+                      ]
+                    },
+                    "period": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "mult": {
+                      "type": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "left",
+                "op",
+                "right"
+              ]
+            }
+          },
+          "exitLong": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "object",
+                  "properties": {
+                    "ind": {
+                      "type": "string",
+                      "enum": [
+                        "close",
+                        "open",
+                        "high",
+                        "low",
+                        "volume",
+                        "ema",
+                        "sma",
+                        "rsi",
+                        "atr",
+                        "roc",
+                        "macd_line",
+                        "macd_signal",
+                        "macd_hist",
+                        "bb_upper",
+                        "bb_mid",
+                        "bb_lower",
+                        "donchian_high",
+                        "donchian_low"
+                      ]
+                    },
+                    "period": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "mult": {
+                      "type": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    ">",
+                    "<",
+                    ">=",
+                    "<=",
+                    "cross_above",
+                    "cross_below"
+                  ]
+                },
+                "right": {
+                  "type": "object",
+                  "properties": {
+                    "ind": {
+                      "type": "string",
+                      "enum": [
+                        "close",
+                        "open",
+                        "high",
+                        "low",
+                        "volume",
+                        "ema",
+                        "sma",
+                        "rsi",
+                        "atr",
+                        "roc",
+                        "macd_line",
+                        "macd_signal",
+                        "macd_hist",
+                        "bb_upper",
+                        "bb_mid",
+                        "bb_lower",
+                        "donchian_high",
+                        "donchian_low"
+                      ]
+                    },
+                    "period": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "mult": {
+                      "type": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "left",
+                "op",
+                "right"
+              ]
+            }
+          },
+          "exitShort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "object",
+                  "properties": {
+                    "ind": {
+                      "type": "string",
+                      "enum": [
+                        "close",
+                        "open",
+                        "high",
+                        "low",
+                        "volume",
+                        "ema",
+                        "sma",
+                        "rsi",
+                        "atr",
+                        "roc",
+                        "macd_line",
+                        "macd_signal",
+                        "macd_hist",
+                        "bb_upper",
+                        "bb_mid",
+                        "bb_lower",
+                        "donchian_high",
+                        "donchian_low"
+                      ]
+                    },
+                    "period": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "mult": {
+                      "type": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    ">",
+                    "<",
+                    ">=",
+                    "<=",
+                    "cross_above",
+                    "cross_below"
+                  ]
+                },
+                "right": {
+                  "type": "object",
+                  "properties": {
+                    "ind": {
+                      "type": "string",
+                      "enum": [
+                        "close",
+                        "open",
+                        "high",
+                        "low",
+                        "volume",
+                        "ema",
+                        "sma",
+                        "rsi",
+                        "atr",
+                        "roc",
+                        "macd_line",
+                        "macd_signal",
+                        "macd_hist",
+                        "bb_upper",
+                        "bb_mid",
+                        "bb_lower",
+                        "donchian_high",
+                        "donchian_low"
+                      ]
+                    },
+                    "period": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "mult": {
+                      "type": "number"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "left",
+                "op",
+                "right"
+              ]
+            }
+          },
+          "stopLossAtr": {
+            "type": "number"
+          },
+          "stopLossPct": {
+            "type": "number"
+          },
+          "takeProfitR": {
+            "type": "number"
+          },
+          "takeProfitPct": {
+            "type": "number"
+          },
+          "trailAtr": {
+            "type": "number"
+          },
+          "riskPct": {
+            "type": "number"
+          },
+          "maxHoldingBars": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxLeverage": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "feeBps": {
+            "type": "number",
+            "minimum": 0
+          },
+          "slippageBps": {
+            "type": "number",
+            "minimum": 0
+          },
+          "fixedCostUsdPerFill": {
+            "type": "number",
+            "minimum": 0
+          },
+          "endTime": {
+            "type": "number",
+            "description": "Exclusive UTC timestamp in milliseconds; defaults to now"
+          },
+          "initialEquity": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "includeTrades": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "interval",
+          "direction",
+          "riskPct"
+        ]
+      }
+    },
+    {
+      "name": "read_strategy",
+      "description": "This agent's active strategy (version, thesis, runnable spec, metrics), auto-promote state, and recent performance.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_performance",
+      "description": "Performance: ledger, Hyperliquid PnL and read-only receipt verification for recent recorded Base swaps, including actual raw token transfers. Base total fees and realized PnL remain incomplete.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "update_strategy",
+      "description": "Evolve the strategy: provide thesis, rationale, and a full runnable spec (same fields as backtest_strategy). It is backtested and judged vs the current champion out-of-sample, then auto-promoted (if enabled) or proposed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thesis": {
+            "type": "string",
+            "description": "prose edge/rules"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "why this change, evidence"
+          },
+          "spec": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "thesis",
+          "rationale",
+          "spec"
+        ]
+      }
+    },
+    {
+      "name": "get_account",
+      "description": "This agent's Hyperliquid equity, free collateral, and open positions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_wallet",
+      "description": "This agent's live Base native ETH and USDC balances plus tokens found in recent trading records or explicitly requested. Reports failed reads as unknown. coreValueUsd covers ETH/USDC only; total value and full token inventory are unknown. Includes Hyperliquid equity and positions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseTokenAddresses": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional additional Base ERC20 addresses to inspect."
+          }
+        }
+      }
+    },
+    {
+      "name": "propose_trade",
+      "description": "Risk-check a perp order and get a signed intent to confirm. Returns violations if blocked, else a plan + intent token. Owner approves the stored order in Trading control before execute_trade, unless a valid autonomous mandate authorizes it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "BTC/ETH/SOL"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "long",
+              "short"
+            ]
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "stopLoss": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "takeProfit": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "requestKey": {
+            "type": "string",
+            "description": "Stable retry key"
+          },
+          "slippagePct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "price": {
+            "type": "number",
+            "description": "optional limit"
+          }
+        },
+        "required": [
+          "symbol",
+          "side",
+          "quantity"
+        ]
+      }
+    },
+    {
+      "name": "execute_trade",
+      "description": "Place the trade from a prior propose_trade, using its intent token. Only call after the user confirms.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "type": "string",
+            "description": "intent token from propose_trade"
+          }
+        },
+        "required": [
+          "intent"
+        ]
+      }
+    },
+    {
+      "name": "token_security",
+      "description": "Smart-contract RISK analysis (GoPlus) for a token by contract on eth/base/arbitrum/optimism/bsc/polygon/avalanche: honeypot, buy/sell tax, mint authority, ownership renounced?, pausable transfers, blacklist, LP lock, holder concentration → risk flags + level. Run before buying an unfamiliar token.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "0x token contract"
+          },
+          "chain": {
+            "type": "string",
+            "description": "eth, base, arbitrum, optimism, bsc, polygon, avalanche"
+          }
+        },
+        "required": [
+          "address"
+        ]
+      }
+    },
+    {
+      "name": "compare_base_routes",
+      "description": "Read-only Base quote comparison: four Uniswap v3 fee tiers plus up to four supplied pools from the initial Aerodrome Slipstream factory, verified at one fresh block. Highest gross output is not net profit or an execution recommendation. Quotes are ERC20; ETH means WETH. Does not create an intent, sign, approve or execute. Full fees and token transfer behavior remain unverified.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tokenIn": {
+            "type": "string",
+            "description": "Base symbol or token contract"
+          },
+          "tokenOut": {
+            "type": "string",
+            "description": "Base symbol or token contract"
+          },
+          "amountIn": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "Positive human-unit decimal string, e.g. 0.0005"
+          },
+          "slipstreamPools": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "description": "Explicit candidate Slipstream pool addresses; identities verified on-chain. Omit for v3 only."
+          }
+        },
+        "required": [
+          "tokenIn",
+          "tokenOut",
+          "amountIn"
+        ]
+      }
+    },
+    {
+      "name": "quote_swap",
+      "description": "Read-only Uniswap v3 swap quotes across supported fee tiers at the same block. Returns gross-output comparison and gas units; does not sign, prepare an intent or execute. Native ETH output is WETH. Gas, approvals and price movement must be considered separately.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": "string",
+            "description": "base (default)"
+          },
+          "tokenIn": {
+            "type": "string",
+            "description": "symbol or 0x"
+          },
+          "tokenOut": {
+            "type": "string",
+            "description": "symbol or 0x"
+          },
+          "amountIn": {
+            "type": "string",
+            "description": "positive human-unit decimal string"
+          }
+        },
+        "required": [
+          "tokenIn",
+          "tokenOut",
+          "amountIn"
+        ]
+      }
+    },
+    {
+      "name": "publish_trade_idea",
+      "description": "Save a structured Base or Robinhood Chain swap recommendation for human review in Midas. Gets a fresh quote and stores a minimum output and expiry. No signer, intent or execution is triggered. Automatic-execution settings do not consume this queue.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "chain": {
+            "type": "string",
+            "enum": [
+              "base",
+              "robinhood"
+            ]
+          },
+          "ideaKey": {
+            "type": "string",
+            "description": "Stable unique identifier for this observation; reuse on retry"
+          },
+          "tokenIn": {
+            "type": "string",
+            "description": "Input symbol or contract"
+          },
+          "tokenOut": {
+            "type": "string",
+            "description": "Output symbol or contract; ETH resolves to WETH"
+          },
+          "amountIn": {
+            "type": "string",
+            "description": "Exact positive decimal string"
+          },
+          "slippageBps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 300
+          },
+          "strategyVersion": {
+            "type": "string",
+            "description": "Research strategy identifier and version"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Entry rationale"
+          },
+          "exitPlan": {
+            "type": "string",
+            "description": "Exit conditions; these are advisory and not automatically executed"
+          },
+          "invalidation": {
+            "type": "string",
+            "description": "When the idea should be discarded"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Supporting observations and limitations"
+          }
+        },
+        "required": [
+          "ideaKey",
+          "tokenIn",
+          "tokenOut",
+          "amountIn",
+          "slippageBps",
+          "strategyVersion",
+          "rationale",
+          "exitPlan",
+          "invalidation",
+          "evidence"
+        ]
+      }
+    },
+    {
+      "name": "list_trade_ideas",
+      "description": "Read recent structured trade ideas and their review/submission statuses. Submitted does not mean filled; use receipt verification.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "propose_swap",
+      "description": "Prepare an on-chain spot swap (Uniswap on Base or Robinhood Chain): quotes it and returns a plan + intent token. tokenIn/tokenOut = 'usdc','weth','eth' or a 0x contract; amountIn as an exact decimal string. ETH output is delivered as WETH; no native unwrap is performed. Show the plan to the user, then execute_swap.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": "string",
+            "description": "base (default)"
+          },
+          "tokenIn": {
+            "type": "string",
+            "description": "symbol or 0x"
+          },
+          "tokenOut": {
+            "type": "string",
+            "description": "symbol or 0x"
+          },
+          "amountIn": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$"
+          },
+          "requestKey": {
+            "type": "string",
+            "description": "Stable retry key"
+          },
+          "slippagePct": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "tokenIn",
+          "tokenOut",
+          "amountIn"
+        ]
+      }
+    },
+    {
+      "name": "execute_swap",
+      "description": "Execute the swap from propose_swap's intent — Turnkey-signed and policy-gated to the router (trade-only). Only after the user confirms. Needs the agent's on-chain wallet funded (gas + tokenIn).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "type": "string",
+            "description": "intent from propose_swap"
+          }
+        },
+        "required": [
+          "intent"
+        ]
+      }
+    }
+  ]
+}

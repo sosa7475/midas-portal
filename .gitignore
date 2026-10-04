@@ -1,24 +1,32 @@
 # Dependencies
-node_modules/
-mobile/node_modules/
-backend/node_modules/
+node_modules
 
-# Env files
+# Env files — never commit secrets
 .env
-backend/.env
-mobile/.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+.next/
+.turbo/
+*.tsbuildinfo
 
 # Expo
-mobile/.expo/
-mobile/dist/
-mobile/web-build/
+.expo/
+apps/mobile/dist/
+apps/mobile/web-build/
+apps/mobile/android/
+apps/mobile/ios/
 
-# Backend uploads
-backend/uploads/
+# Uploads (dev)
+uploads/
+
+# Vercel
+.vercel/
 
 # OS
 .DS_Store
 
-# Build
-mobile/android/
-mobile/ios/
+# Logs
+*.log

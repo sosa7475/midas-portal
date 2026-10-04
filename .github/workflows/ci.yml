@@ -1,0 +1,33 @@
+name: Midas web checks
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: midas
+          POSTGRES_PASSWORD: isolated-test-password
+          POSTGRES_DB: midas_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U midas -d midas_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @midas/web typecheck
+      - run: pnpm --filter @midas/web test
+      - run: pnpm --filter @midas/web export:mcp -- --check
+      - run: pnpm --filter @midas/web test:integration
+        env:
+          MIDAS_TEST_DATABASE_URL: postgres://midas:isolated-test-password@127.0.0.1:5432/midas_test
+      - run: pnpm --filter @midas/web build
