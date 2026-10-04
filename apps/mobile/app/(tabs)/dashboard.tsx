@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useStore } from '../../src/store';
-import { walletAPI, tradeAPI } from '../../src/services/api';
+import { walletAPI, tradeAPI, onchainAPI } from '../../src/services/api';
 import GlassCard from '../../src/components/GlassCard';
 import { Colors, Typography, Spacing, Radius } from '../../src/theme';
 import { useState } from 'react';
@@ -13,14 +13,20 @@ export default function DashboardScreen() {
   const { balance, setBalance, trades, setTrades, user } = useStore();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(!balance);
+  const [pulse, setPulse] = useState<any>(null);
 
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
     try {
-      const [balRes, tradeRes] = await Promise.allSettled([walletAPI.getBalance(), tradeAPI.history(10)]);
+      const [balRes, tradeRes, pulseRes] = await Promise.allSettled([
+        walletAPI.getBalance(),
+        tradeAPI.history(10),
+        onchainAPI.pulse(),
+      ]);
       if (balRes.status === 'fulfilled') setBalance(balRes.value.data);
       if (tradeRes.status === 'fulfilled') setTrades(tradeRes.value.data.trades);
+      if (pulseRes.status === 'fulfilled') setPulse(pulseRes.value.data);
     } catch {} finally {
       setLoading(false);
       setRefreshing(false);
@@ -28,9 +34,11 @@ export default function DashboardScreen() {
   }
 
   const recentTrades = trades.slice(0, 5);
-  const totalPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
-  const winRate = trades.length > 0
-    ? Math.round((trades.filter((t) => (t.pnl || 0) > 0).length / trades.filter((t) => t.pnl != null).length) * 100)
+  // Postgres returns DECIMAL columns (incl. pnl) as strings, so coerce with Number().
+  const pnlTrades = trades.filter((t) => t.pnl != null);
+  const totalPnl = pnlTrades.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+  const winRate = pnlTrades.length > 0
+    ? Math.round((pnlTrades.filter((t) => Number(t.pnl) > 0).length / pnlTrades.length) * 100)
     : null;
 
   return (
@@ -86,6 +94,33 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        {/* Markets pulse (DefiLlama) */}
+        {pulse && (
+          <>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Markets Pulse</Text>
+            <View style={styles.statsRow}>
+              <GlassCard style={styles.statCard}>
+                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Stables 7d</Text>
+                <Text style={[styles.statValue, { color: pulseColor(pulse.stablecoinTopChange7d) }]}>
+                  {fmtPct(pulse.stablecoinTopChange7d)}
+                </Text>
+              </GlassCard>
+              <GlassCard style={styles.statCard}>
+                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Perps 7d</Text>
+                <Text style={[styles.statValue, { color: pulseColor(pulse.perpsChange7d) }]}>
+                  {fmtPct(pulse.perpsChange7d)}
+                </Text>
+              </GlassCard>
+              <GlassCard style={styles.statCard}>
+                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>ETH TVL 7d</Text>
+                <Text style={[styles.statValue, { color: pulseColor(pulse.ethereumTvlChange7d) }]}>
+                  {fmtPct(pulse.ethereumTvlChange7d)}
+                </Text>
+              </GlassCard>
+            </View>
+          </>
+        )}
+
         {/* Recent trades */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Trades</Text>
         {recentTrades.length === 0 ? (
@@ -97,7 +132,7 @@ export default function DashboardScreen() {
             <GlassCard key={trade.id} style={styles.tradeRow}>
               <View style={styles.tradeLeft}>
                 <Text style={[styles.tradePair, { color: theme.text }]}>{trade.pair}</Text>
-                <Text style={[styles.tradeDate, { color: theme.textMuted }]}>{new Date(trade.createdAt).toLocaleDateString()}</Text>
+                <Text style={[styles.tradeDate, { color: theme.textMuted }]}>{new Date(trade.created_at || trade.createdAt || Date.now()).toLocaleDateString()}</Text>
               </View>
               <View style={styles.tradeRight}>
                 <View style={[styles.sideTag, { backgroundColor: trade.side === 'long' ? Colors.profit + '22' : Colors.loss + '22' }]}>
@@ -106,8 +141,8 @@ export default function DashboardScreen() {
                   </Text>
                 </View>
                 {trade.pnl != null && (
-                  <Text style={{ color: trade.pnl >= 0 ? Colors.profit : Colors.loss, fontWeight: Typography.weights.semibold, marginTop: 2 }}>
-                    {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
+                  <Text style={{ color: Number(trade.pnl) >= 0 ? Colors.profit : Colors.loss, fontWeight: Typography.weights.semibold, marginTop: 2 }}>
+                    {Number(trade.pnl) >= 0 ? '+' : ''}${Number(trade.pnl).toFixed(2)}
                   </Text>
                 )}
               </View>
@@ -124,6 +159,17 @@ function getTimeOfDay() {
   if (h < 12) return 'morning';
   if (h < 18) return 'afternoon';
   return 'evening';
+}
+
+function fmtPct(v: number | null | undefined) {
+  if (v == null || isNaN(v)) return '—';
+  const sign = v >= 0 ? '+' : '';
+  return `${sign}${v.toFixed(2)}%`;
+}
+
+function pulseColor(v: number | null | undefined) {
+  if (v == null || isNaN(v)) return Colors.neutral;
+  return v >= 0 ? Colors.profit : Colors.loss;
 }
 
 const styles = StyleSheet.create({

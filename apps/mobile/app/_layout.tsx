@@ -1,5 +1,3 @@
-// MUST be first: crypto.getRandomValues polyfill (uuid crashes RN without it)
-import 'react-native-get-random-values';
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';

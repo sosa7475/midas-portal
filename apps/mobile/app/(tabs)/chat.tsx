@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { v4 as uuidv4 } from 'uuid';
+import { genId as uuidv4 } from '../../src/utils/id';
 import { useStore } from '../../src/store';
 import { chatAPI, strategyAPI, tradeAPI, streamChat } from '../../src/services/api';
 import TradeCard from '../../src/components/TradeCard';
@@ -76,6 +76,9 @@ export default function ChatScreen() {
         updateAssistant(assistantContent || `Error: ${data.error}`, tradeRec);
         setTyping(false);
       }
+    }, () => {
+      if (!assistantContent) setMessages(useStore.getState().messages.filter(m => m.id !== assistantId));
+      setTyping(false);
     });
 
     setTimeout(() => {

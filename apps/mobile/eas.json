@@ -4,20 +4,32 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "env": { "EXPO_PUBLIC_API_URL": "http://localhost:3001" }
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:3001"
+      }
     },
     "preview": {
       "distribution": "internal",
       "ios": { "simulator": false },
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_API_URL": "https://midas-portal-api.fly.dev" }
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://midas-portal-api.vercel.app"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "env": { "EXPO_PUBLIC_API_URL": "https://midas-portal-api.fly.dev" }
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://midas-portal-api.vercel.app"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "REPLACE-WITH-YOUR-APPLE-ID-EMAIL",
+        "ascAppId": "REPLACE-WITH-APP-STORE-CONNECT-APP-ID",
+        "appleTeamId": "REPLACE-WITH-YOUR-APPLE-TEAM-ID"
+      }
+    }
   }
 }

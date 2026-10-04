@@ -30,8 +30,9 @@ export default function HistoryScreen() {
   }
 
   const filtered = filter === 'all' ? trades : trades.filter((t) => t.side === filter);
-  const totalPnl = filtered.reduce((s, t) => s + (t.pnl || 0), 0);
-  const wins = filtered.filter((t) => (t.pnl || 0) > 0).length;
+  // Postgres returns DECIMAL pnl as a string; coerce with Number() before math.
+  const totalPnl = filtered.reduce((s, t) => s + Number(t.pnl || 0), 0);
+  const wins = filtered.filter((t) => Number(t.pnl || 0) > 0).length;
 
   function renderTrade({ item: trade }: { item: any }) {
     const isLong = trade.side === 'long';

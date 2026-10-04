@@ -1,6 +1,4 @@
--- 0001_init: base schema (migrated from the MVP schema.sql).
--- Change from MVP: trades.status CHECK includes 'partial' — Orderly statuses are
--- mapped server-side into this canonical set (fixes the 'submitted' CHECK violation).
+-- Midas Portal Database Schema
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -40,17 +38,15 @@ CREATE TABLE IF NOT EXISTS trades (
   stop_loss DECIMAL(20, 8),
   take_profit DECIMAL(20, 8),
   order_id VARCHAR(255),
-  status VARCHAR(50) DEFAULT 'pending'
-    CHECK (status IN ('pending', 'confirmed', 'partial', 'filled', 'cancelled', 'rejected')),
+  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'filled', 'cancelled', 'rejected')),
   pnl DECIMAL(20, 8),
   screenshot_url TEXT,
   agent_reasoning TEXT,
-  idempotency_key VARCHAR(64),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Encrypted API keys (user-provided LLM keys and Orderly credentials); AES-256-GCM at rest
+-- Encrypted API keys (for user-provided LLM keys and Orderly credentials)
 CREATE TABLE IF NOT EXISTS api_keys (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -62,13 +58,13 @@ CREATE TABLE IF NOT EXISTS api_keys (
   UNIQUE(user_id, provider)
 );
 
--- Agent conversation history
+-- Agent conversation history (per user session)
 CREATE TABLE IF NOT EXISTS conversations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
   content TEXT NOT NULL,
-  metadata JSONB,
+  metadata JSONB,  -- trade recommendation, screenshot analysis, etc.
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -76,8 +72,6 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE INDEX IF NOT EXISTS idx_strategies_user_id ON strategies(user_id);
 CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id);
 CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_trades_idempotency
-  ON trades(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at);
 CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
