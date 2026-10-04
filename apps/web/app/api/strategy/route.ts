@@ -6,7 +6,7 @@ import { getSession } from "../../../lib/server/auth";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const s = getSession(req);
+  const s = await getSession(req);
   if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const r = await query<any>(
     "SELECT id, name, rules_text, created_at FROM strategies WHERE user_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT 1",
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 const Body = z.object({ rulesText: z.string().min(10).max(10000), name: z.string().max(100).optional() });
 
 export async function POST(req: NextRequest) {
-  const s = getSession(req);
+  const s = await getSession(req);
   if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Strategy rules required (min 10 chars)" }, { status: 400 });

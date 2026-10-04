@@ -41,7 +41,7 @@ export default function MyAgents() {
           {agents.map((a) => (
             <Link key={a.id} href={`/agents/${a.id}`} className="card" style={{ display: "block" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <span style={{ width: 40, height: 40, borderRadius: 10, background: "linear-gradient(135deg,#e2622f,#f2913f)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>
+                <span style={{ width: 40, height: 40, borderRadius: 10, background: "linear-gradient(135deg,var(--brand),var(--brand-2))", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>
                   {a.name.slice(0, 1).toUpperCase()}
                 </span>
                 <div style={{ fontWeight: 650, fontSize: 16 }}>{a.name}</div>

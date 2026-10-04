@@ -64,7 +64,7 @@ export default function NewAgent() {
 
         <div>
           <label className="label">Connect trading MCPs</label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid-auto" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {MCPS.map((m) => {
               const on = mcps.includes(m.id);
               return (

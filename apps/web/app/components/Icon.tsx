@@ -22,6 +22,14 @@ const P: Record<string, ReactNode> = {
   terminal: <><rect x="3" y="4" width="18" height="16" rx="2.5" /><path d="M7 9l3 3-3 3M13 15h4" /></>,
   spark: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" />,
   nft: <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" /></>,
+  image: <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.8" /><path d="M21 15l-5-5L5 21" /></>,
+  x: <path d="M18 6L6 18M6 6l12 12" />,
+  candles: <><rect x="4" y="8" width="4" height="8" rx="1" /><path d="M6 4v4M6 16v4" /><rect x="14" y="6" width="4" height="9" rx="1" /><path d="M16 3v3M16 15v3" /></>,
+  scale: <><path d="M12 3v18M5 21h14" /><path d="M12 6l-6 2 6-2 6 2-6-2" /><path d="M6 8l-3 6a3 3 0 0 0 6 0zM18 8l-3 6a3 3 0 0 0 6 0z" /></>,
+  building: <><rect x="5" y="3" width="14" height="18" rx="1.5" /><path d="M9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01M10 21v-3h4v3" /></>,
+  feather: <><path d="M20.24 3.76a6 6 0 0 0-8.49 0L4 11.5V20h8.5l7.74-7.75a6 6 0 0 0 0-8.49z" /><path d="M16 8L2 22M17.5 11H9" /></>,
+  shield: <><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" /><path d="M9 12l2 2 4-4" /></>,
+  bank: <><path d="M3 10l9-6 9 6" /><path d="M5 10v8M10 10v8M14 10v8M19 10v8M3 21h18" /></>,
 };
 
 export function Icon({ name, size = 18, style }: { name: string; size?: number; style?: CSSProperties }) {

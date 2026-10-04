@@ -18,7 +18,7 @@ export function clientIp(req: NextRequest): string {
   return (fwd ? fwd.split(",")[0].trim() : null) || req.headers.get("x-real-ip") || "unknown";
 }
 
-/** Returns true if allowed, false if the limit for `key` is exceeded. Fails open on DB error. */
+/** Returns true if allowed, false if the limit for `key` is exceeded. Fails closed on DB error. */
 export async function rateLimit(key: string, limit: number, windowSec: number): Promise<boolean> {
   try {
     await ensure();
@@ -32,6 +32,6 @@ export async function rateLimit(key: string, limit: number, windowSec: number): 
     );
     return Number(r.rows[0]?.count ?? 1) <= limit;
   } catch {
-    return true;
+    return false;
   }
 }

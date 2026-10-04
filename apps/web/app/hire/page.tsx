@@ -4,8 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/useAuth";
-import { mcpById } from "../../lib/mcps";
-import { Icon } from "../components/Icon";
 
 const TEMPLATES = [
   {
@@ -55,19 +53,15 @@ export default function Hire() {
   }
 
   return (
-    <main className="container" style={{ paddingTop: 34, paddingBottom: 80 }}>
-      <h1 style={{ marginBottom: 4 }}>Hire an Agent</h1>
-      <p className="text-2" style={{ marginBottom: 26 }}>Start from a proven template — it&apos;s added to your agents, fully editable.</p>
+    <main className="container" style={{ paddingTop: 22, paddingBottom: 60 }}>
+      <h1 style={{ marginBottom: 16 }}>Hire an Agent</h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+      <div className="grid-metrics" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
         {TEMPLATES.map((t) => (
-          <div key={t.name} className="card" style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontWeight: 650, fontSize: 16, marginBottom: 6 }}>{t.name}</div>
-            <div className="text-2" style={{ fontSize: 14, flex: 1 }}>{t.blurb}</div>
-            <div style={{ display: "flex", gap: 6, margin: "14px 0", flexWrap: "wrap" }}>
-              {t.mcps.map((id) => <span key={id} className="badge badge-soft"><Icon name={mcpById(id)?.icon ?? "spark"} size={12} /> {mcpById(id)?.name}</span>)}
-            </div>
-            <button className="btn btn-solid btn-sm" onClick={() => hire(t)} disabled={busy === t.name}>{busy === t.name ? "Adding…" : "Hire this agent"}</button>
+          <div key={t.name} className="card" style={{ display: "flex", flexDirection: "column", gap: 8, padding: 16 }}>
+            <div style={{ fontWeight: 650, fontSize: 15 }}>{t.name}</div>
+            <div className="text-2" style={{ fontSize: 13, lineHeight: 1.45, flex: 1, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{t.blurb}</div>
+            <button className="btn btn-solid btn-sm" onClick={() => hire(t)} disabled={busy === t.name} style={{ width: "100%" }}>{busy === t.name ? "Adding…" : "Hire"}</button>
           </div>
         ))}
       </div>

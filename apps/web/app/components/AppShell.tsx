@@ -5,12 +5,17 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { Icon } from "./Icon";
+import { BrandMark } from "./BrandMark";
 
 const NAV = [
+  { label: "Trading control", href: "/trading", icon: "chart" },
   { label: "Overview", href: "/overview", icon: "overview" },
   { label: "Hire an Agent", href: "/hire", icon: "hire" },
   { label: "My Agents", href: "/agents", icon: "agents" },
+  { label: "Activity", href: "/activity", icon: "layers" },
+  { label: "Backtest", href: "/backtest", icon: "chart" },
   { label: "Wallet", href: "/wallet", icon: "wallet" },
+  { label: "Bank", href: "/bank", icon: "bank" },
 ];
 
 function useTheme(): [string, () => void] {
@@ -27,8 +32,8 @@ function useTheme(): [string, () => void] {
 
 function Logo({ collapsed }: { collapsed?: boolean }) {
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700, fontSize: 16 }}>
-      <span style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg, var(--brand-2), var(--brand))", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, boxShadow: "var(--glow)" }}>M</span>
+    <span className="display" style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 800, fontSize: 17, letterSpacing: "0.02em" }}>
+      <BrandMark height={30} />
       {!collapsed && "Midas"}
     </span>
   );
@@ -39,14 +44,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [theme, toggleTheme] = useTheme();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     try { setCollapsed(localStorage.getItem("midas-sidebar") === "1"); } catch {}
   }, []);
+  useEffect(() => { setMobileOpen(false); }, [pathname]); // close drawer on navigation
   const toggleCollapsed = () => setCollapsed((c) => { const n = !c; try { localStorage.setItem("midas-sidebar", n ? "1" : "0"); } catch {} return n; });
 
   const ThemeBtn = (
-    <button className="btn btn-icon btn-outline" onClick={toggleTheme} title="Toggle theme" aria-label="Toggle theme">
+    <button className="btn btn-icon btn-outline" style={{ borderRadius: 999, flexShrink: 0 }} onClick={toggleTheme} title="Toggle theme" aria-label="Toggle theme">
       <Icon name={theme === "dark" ? "sun" : "moon"} size={17} />
     </button>
   );
@@ -55,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (pathname === "/" || pathname === "/login") {
     return (
       <>
-        <nav style={{ display: "flex", alignItems: "center", height: 62, padding: "0 26px", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, zIndex: 40, background: "var(--surface)", backdropFilter: "blur(var(--glass-blur))" }}>
+        <nav style={{ display: "flex", alignItems: "center", height: 62, padding: "0 clamp(14px, 4vw, 26px)", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, zIndex: 40, background: "var(--surface)", backdropFilter: "blur(var(--glass-blur))" }}>
           <Link href="/"><Logo /></Link>
           <div style={{ flex: 1 }} />
           <div style={{ display: "flex", gap: 10 }}>
@@ -70,7 +77,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="shell">
-      <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
+      {/* Mobile top bar (hidden on desktop via CSS) */}
+      <div className="mobile-topbar">
+        <button className="hamburger" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Icon name="panel" size={18} /></button>
+        <Link href="/overview" style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}><Logo /></Link>
+        {ThemeBtn}
+      </div>
+      {mobileOpen && <div className="scrim" onClick={() => setMobileOpen(false)} />}
+
+      <aside className={`sidebar${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`}>
         <div className="side-top">
           {!collapsed && <Link href="/overview" style={{ flex: 1 }}><Logo /></Link>}
           <button className="side-collapse" onClick={toggleCollapsed} title={collapsed ? "Expand" : "Collapse"} aria-label="Toggle sidebar">
@@ -78,12 +93,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <Link href="/agents/new" className="btn btn-solid" style={{ marginBottom: 8, justifyContent: collapsed ? "center" : "flex-start", padding: collapsed ? 0 : "0 14px" }}>
+        <Link href="/agents/new" onClick={() => setMobileOpen(false)} className="btn btn-solid" style={{ marginBottom: 8, justifyContent: collapsed ? "center" : "flex-start", padding: collapsed ? 0 : "0 14px" }}>
           <Icon name="plus" size={18} />{!collapsed && "New Agent"}
         </Link>
 
         {NAV.map((n) => (
-          <Link key={n.href} href={n.href} className={`side-item${pathname.startsWith(n.href) ? " active" : ""}`} title={n.label}>
+          <Link key={n.href} href={n.href} onClick={() => setMobileOpen(false)} className={`side-item${pathname.startsWith(n.href) ? " active" : ""}`} title={n.label}>
             <Icon name={n.icon} size={19} />
             <span className="side-label">{n.label}</span>
           </Link>

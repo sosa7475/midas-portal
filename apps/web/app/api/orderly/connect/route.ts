@@ -9,7 +9,7 @@ export const maxDuration = 60;
 const BASES = { testnet: "https://testnet-api-evm.orderly.org", mainnet: "https://api-evm.orderly.org" };
 
 export async function POST(req: NextRequest) {
-  const s = getSession(req);
+  const s = await getSession(req);
   if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await req.json().catch(() => ({}))) as any;
   const agentId = body.agentId;

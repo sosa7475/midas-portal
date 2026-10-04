@@ -24,6 +24,10 @@ export interface RiskInput {
 export interface RiskVerdict { ok: boolean; violations: string[]; notionalUsd: number; leverage: number }
 
 export function checkOrder(i: RiskInput, limits: RiskLimits = DEFAULT_LIMITS): RiskVerdict {
+  const invalid = [i.price, i.quantity, i.equityUsd].some(v => !Number.isFinite(v) || v <= 0)
+    || (i.stopLoss !== undefined && (!Number.isFinite(i.stopLoss) || i.stopLoss <= 0))
+    || Object.values(limits).some(v => !Number.isFinite(v) || v < 0);
+  if (invalid) return {ok:false, violations:["Price, quantity, equity and limits must be valid finite values"], notionalUsd:0, leverage:0};
   const notionalUsd = i.price * i.quantity;
   const leverage = i.equityUsd > 0 ? notionalUsd / i.equityUsd : Infinity;
   const violations: string[] = [];

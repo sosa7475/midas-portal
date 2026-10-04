@@ -7,7 +7,7 @@ import { ensureAgentsTable, rowToAgent } from "../../../lib/server/agents-sql";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const s = getSession(req);
+  const s = await getSession(req);
   if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureAgentsTable();
   const r = await query("SELECT id, name, instructions, mcps, created_at FROM agents WHERE user_id = $1 ORDER BY created_at DESC", [s.userId]);
@@ -21,7 +21,7 @@ const Body = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const s = getSession(req);
+  const s = await getSession(req);
   if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Agent name is required" }, { status: 400 });

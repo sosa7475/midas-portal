@@ -56,6 +56,14 @@ export const api = {
     messages: (id: string) => req("GET", `/api/agents/${id}/messages`),
     create: (a: { name: string; instructions: string; mcps: string[] }) => req("POST", "/api/agents", a),
     remove: (id: string) => req("DELETE", `/api/agents/${id}`),
+    connectorList: (id: string) => req("GET", `/api/agents/${id}/connector`),
+    connectorCreate: (id: string, label?: string,scopes?:string[]) => req("POST", `/api/agents/${id}/connector`, { label,scopes }),
+    connectorRevoke: (id: string, tokenId: string) => req("DELETE", `/api/agents/${id}/connector?tokenId=${tokenId}`),
+    strategy: (id: string) => req("GET", `/api/agents/${id}/strategy`),
+    approveStrategy: (id: string, version: number) => req("POST", `/api/agents/${id}/strategy`, { action: "approve", version }),
+    setAutoPromote: (id: string, on: boolean) => req("POST", `/api/agents/${id}/strategy`, { action: "autoPromote", on }),
+    riskGet: (id: string) => req("GET", `/api/agents/${id}/risk`),
+    riskSet: (id: string, patch: Record<string, unknown>) => req("PUT", `/api/agents/${id}/risk`, patch),
   },
   orderly: {
     list: () => req("GET", "/api/orderly/list"),
@@ -66,17 +74,39 @@ export const api = {
     order: (agentId: string, o: { symbol: string; side: string; type?: string; quantity: number; price?: number; reduceOnly?: boolean }) => req("POST", "/api/orderly/order", { agentId, ...o }),
     faucet: (agentId: string) => req("POST", "/api/orderly/faucet", { agentId }),
   },
+  hl: {
+    list: () => req("GET", "/api/hl/list"),
+    account: (agentId: string) => req("GET", `/api/hl/account?agentId=${agentId}`),
+    generate: (agentId: string, network = "testnet") => req("POST", "/api/hl/connect", { agentId, network }),
+    disconnect: (agentId: string) => req("POST", "/api/hl/disconnect", { agentId }),
+    order: (agentId: string, o: { symbol: string; side: string; quantity: number; price?: number; reduceOnly?: boolean }) => req("POST", "/api/hl/order", { agentId, ...o }),
+  },
+  backtest: (body: Record<string, unknown>) => req("POST", "/api/backtest", body),
+  portfolio: () => req("GET", "/api/portfolio"),
+  activity: () => req("GET", "/api/activity"),
+  turnkey: {
+    get: (agentId: string) => req("GET", `/api/turnkey/account?agentId=${agentId}`),
+    provision: (agentId: string) => req("POST", "/api/turnkey/connect", { agentId }),
+    upgrade: (agentId: string) => req("POST", "/api/turnkey/upgrade", { agentId }),
+    setOwner: (agentId: string, address: string) => req("PUT", "/api/turnkey/withdraw", { agentId, address }),
+    withdraw: (agentId: string, o: { asset: string; amount: number; chain?: string }) => req("POST", "/api/turnkey/withdraw", { agentId, ...o }),
+    swap: (agentId: string, o: { tokenIn: string; tokenOut: string; amountIn: number; chain?: string; slippagePct?: number }) => req("POST", "/api/turnkey/swap", { agentId, ...o }),
+  },
+  bank: {
+    wallet: () => req("GET", "/api/bank/wallet"),
+    send: (o: { to: string; asset: string; amount: number; chain?: string }) => req("POST", "/api/bank/send", o),
+  },
 };
 
 /** Stream a chat message. Cookie is sent automatically (same-origin). Returns an abort fn. */
-export function streamChat(message: string, onEvent: (e: any) => void, agentId?: string): () => void {
+export function streamChat(message: string, onEvent: (e: any) => void, agentId?: string, images?: string[]): () => void {
   const controller = new AbortController();
   (async () => {
     const res = await fetch("/api/chat", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, agentId }),
+      body: JSON.stringify({ message, agentId, images }),
       signal: controller.signal,
     });
     const reader = res.body?.getReader();

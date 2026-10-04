@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (!r.rows.length) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     const u = r.rows[0];
     if (!(await bcrypt.compare(password, u.password_hash))) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-    const token = signToken({ userId: u.id, email: u.email });
+    const token = await signToken({ userId: u.id, email: u.email });
     const res = NextResponse.json({ user: { id: u.id, email: u.email, displayName: u.display_name } });
     setAuthCookie(res, token);
     return res;

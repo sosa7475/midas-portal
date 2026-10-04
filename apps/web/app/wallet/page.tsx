@@ -4,16 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/useAuth";
-import { Icon } from "../components/Icon";
+import { ConnectWallet } from "../components/ConnectWallet";
 
 export default function Wallet() {
   const ready = useAuth();
   const [agents, setAgents] = useState<any[] | null>(null);
   const [statuses, setStatuses] = useState<Record<string, any>>({});
-  const [modalAgent, setModalAgent] = useState<string | null>(null);
 
   async function refresh() {
-    const [a, s] = await Promise.all([api.agents.list().catch(() => ({ agents: [] })), api.orderly.list().catch(() => ({ statuses: {} }))]);
+    const [a, s] = await Promise.all([api.agents.list().catch(() => ({ agents: [] })), api.hl.list().catch(() => ({ statuses: {} }))]);
     setAgents(a.agents);
     setStatuses(s.statuses ?? {});
   }
@@ -23,8 +22,8 @@ export default function Wallet() {
   return (
     <main className="container" style={{ paddingTop: 34, paddingBottom: 80, maxWidth: 920 }}>
       <h1 style={{ marginBottom: 4 }}>Wallet</h1>
-      <p className="text-2" style={{ marginBottom: 8 }}>Each agent has its own <strong>segregated</strong> Orderly (QuickPerps) account — isolated funds, keys, and risk.</p>
-      <p className="muted" style={{ marginBottom: 26, fontSize: 13 }}>Keys are stored encrypted (AES-256-GCM) and scoped read/trading — no withdrawal rights.</p>
+      <p className="text-2" style={{ marginBottom: 8 }}>Each agent has its own <strong>segregated</strong> Hyperliquid perps account — isolated funds, keys, and risk.</p>
+      <p className="muted" style={{ marginBottom: 26, fontSize: 13 }}>The agent key is stored encrypted (AES-256-GCM) and is trade-only — it cannot withdraw. Funds stay under your control.</p>
 
       {agents === null ? (
         <p className="muted">Loading…</p>
@@ -36,35 +35,32 @@ export default function Wallet() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {agents.map((a) => (
-            <AgentWallet key={a.id} agent={a} status={statuses[a.id]} onConnectKey={() => setModalAgent(a.id)} onChange={refresh} />
+            <div key={a.id} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <AgentWallet agent={a} status={statuses[a.id]} onChange={refresh} />
+              <OnchainWallet agent={a} />
+            </div>
           ))}
         </div>
       )}
-
-      {modalAgent && <ApiKeyModal agentId={modalAgent} onClose={() => setModalAgent(null)} onDone={async () => { setModalAgent(null); await refresh(); }} />}
     </main>
   );
 }
 
-function AgentWallet({ agent, status, onConnectKey, onChange }: { agent: any; status: any; onConnectKey: () => void; onChange: () => void }) {
+function AgentWallet({ agent, status, onChange }: { agent: any; status: any; onChange: () => void }) {
   const connected = !!status?.connected;
   const [account, setAccount] = useState<any>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => { if (connected) api.orderly.account(agent.id).then(setAccount).catch(() => {}); }, [connected, agent.id]);
+  async function loadAccount() { const a = await api.hl.account(agent.id).catch(() => null); if (a) setAccount(a); }
+  useEffect(() => { if (connected) loadAccount(); }, [connected, agent.id]);
 
   const money = (v: any) => v == null ? "—" : `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const addr = status?.address ?? account?.address;
 
-  async function generate() { setBusy("gen"); try { await api.orderly.generate(agent.id); await onChange(); } finally { setBusy(null); } }
-  async function disconnect() { setBusy("disc"); await api.orderly.disconnect(agent.id).catch(() => {}); setAccount(null); await onChange(); setBusy(null); }
-  async function fund() {
-    setBusy("fund");
-    try {
-      await api.orderly.faucet(agent.id);
-      // balance takes a few seconds to reflect — poll a couple times
-      for (let i = 0; i < 4; i++) { await new Promise((r) => setTimeout(r, 2500)); const a = await api.orderly.account(agent.id).catch(() => null); if (a?.equity > 0) { setAccount(a); break; } setAccount(a); }
-    } finally { setBusy(null); }
-  }
+  async function generate() { setBusy("gen"); try { await api.hl.generate(agent.id); await onChange(); } finally { setBusy(null); } }
+  async function disconnect() { setBusy("disc"); await api.hl.disconnect(agent.id).catch(() => {}); setAccount(null); await onChange(); setBusy(null); }
+  async function copy() { if (addr) { await navigator.clipboard.writeText(addr).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500); } }
 
   return (
     <div className="card">
@@ -73,7 +69,7 @@ function AgentWallet({ agent, status, onConnectKey, onChange }: { agent: any; st
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 650 }}>{agent.name}</div>
           <div className="text-2 mono" style={{ fontSize: 12.5 }}>
-            {connected ? `Orderly · ${status.network} · ${status.address ? status.address.slice(0, 6) + "…" + status.address.slice(-4) : status.accountId?.slice(0, 10) + "…"}` : "No trading account"}
+            {connected ? `Hyperliquid · ${status.network} · ${addr ? addr.slice(0, 6) + "…" + addr.slice(-4) : "—"}` : "No trading account"}
           </div>
         </div>
         <span className={`badge ${connected ? "badge-on" : "badge-soft"}`}>{connected ? "Connected" : "Not connected"}</span>
@@ -81,19 +77,32 @@ function AgentWallet({ agent, status, onConnectKey, onChange }: { agent: any; st
 
       {!connected ? (
         <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button className="btn btn-solid btn-sm" onClick={generate} disabled={busy === "gen"}>{busy === "gen" ? "Creating…" : "Generate testnet account"}</button>
-          <button className="btn btn-outline btn-sm" onClick={onConnectKey}>Use existing API key</button>
+          <button className="btn btn-solid btn-sm" onClick={generate} disabled={busy === "gen"}>{busy === "gen" ? "Creating…" : "Create trading account"}</button>
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 16 }}>
-            {[["Equity", money(account?.equity)], ["PnL (30d)", money(account?.realizedPnl30d)], ["Positions", account ? String(account.openPositions ?? 0) : "—"], ["Free", money(account?.freeCollateral)]].map(([k, v]) => (
+          <div className="grid-metrics" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 16 }}>
+            {[["Equity", money(account?.equity)], ["Free collateral", money(account?.freeCollateral)], ["Open positions", account ? String(account.openPositions ?? 0) : "—"], ["Network", status.network]].map(([k, v]) => (
               <div key={k}><div className="muted" style={{ fontSize: 11 }}>{k}</div><div style={{ fontWeight: 700, fontSize: 16 }}>{v}</div></div>
             ))}
           </div>
+
+          {(!account?.equity || account.equity === 0) && (
+            <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 6 }}>Fund this account to start trading</div>
+              <p className="text-2" style={{ fontSize: 13, marginBottom: 10 }}>
+                Send USDC to this agent&apos;s address on Hyperliquid ({status.network}), or approve it as an agent wallet on your funded HL account. On {status.network}, use the <a href={status.network === "testnet" ? "https://app.hyperliquid-testnet.xyz/drip" : "https://app.hyperliquid.xyz"} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>Hyperliquid app</a>.
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <code className="mono" style={{ fontSize: 12.5, background: "var(--surface)", padding: "6px 10px", borderRadius: 7, flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{addr}</code>
+                <button className="btn btn-outline btn-sm" onClick={copy}>{copied ? "Copied" : "Copy"}</button>
+                <button className="btn btn-ghost btn-sm" onClick={loadAccount}>Refresh</button>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
-            {status.network === "testnet" && <button className="btn btn-outline btn-sm" onClick={fund} disabled={busy === "fund"}>{busy === "fund" ? "Funding…" : "Get testnet USDC"}</button>}
-            {status.address && <span className="muted mono" style={{ fontSize: 12 }}>{status.address.slice(0, 10)}… · {status.network}</span>}
+            {account?.equity > 0 && <button className="btn btn-outline btn-sm" onClick={loadAccount}>Refresh</button>}
             <div style={{ flex: 1 }} />
             <button className="btn btn-ghost btn-sm" onClick={disconnect} disabled={busy === "disc"}>Disconnect</button>
           </div>
@@ -103,39 +112,83 @@ function AgentWallet({ agent, status, onConnectKey, onChange }: { agent: any; st
   );
 }
 
-function ApiKeyModal({ agentId, onClose, onDone }: { agentId: string; onClose: () => void; onDone: () => void }) {
-  const [accountId, setAccountId] = useState("");
-  const [orderlyKey, setOrderlyKey] = useState("");
-  const [secretHex, setSecretHex] = useState("");
-  const [network, setNetwork] = useState("testnet");
+function OnchainWallet({ agent }: { agent: any }) {
+  const [acct, setAcct] = useState<any>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
-  async function submit() {
-    setBusy(true); setError(null);
-    try { await api.orderly.connectKey(agentId, { accountId, orderlyKey, secretHex, network }); onDone(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Could not connect"); setBusy(false); }
-  }
+  async function load() { const a = await api.turnkey.get(agent.id).catch(() => null); setAcct(a); setLoaded(true); }
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [agent.id]);
+
+  const [chainMsg, setChainMsg] = useState<string | null>(null);
+  async function provision() { setBusy(true); try { await api.turnkey.provision(agent.id); await load(); } finally { setBusy(false); } }
+  async function enableChains() { setChainMsg("Enabling…"); try { const r = await api.turnkey.upgrade(agent.id); setChainMsg(r.ok ? "All chains enabled ✓" : (r.error || "Failed")); } catch { setChainMsg("Failed"); } }
+  if (!loaded) return null;
+
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }} onClick={onClose}>
-      <div className="card" style={{ width: 460, maxWidth: "100%" }} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ marginBottom: 6 }}>Connect Orderly account</h2>
-        <p className="text-2" style={{ fontSize: 13.5, marginBottom: 18 }}>This agent&apos;s own account. Paste an Orderly account id + ed25519 orderly-key. Stored encrypted; scoped read/trading (no withdrawals).</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <label className="label">Network</label>
-            <div style={{ display: "flex", gap: 8 }}>{["testnet", "mainnet"].map((n) => <span key={n} className={`chip${network === n ? " on" : ""}`} onClick={() => setNetwork(n)}>{n}</span>)}</div>
-          </div>
-          <div><label className="label">Account ID</label><input className="input mono" placeholder="0x…" value={accountId} onChange={(e) => setAccountId(e.target.value)} /></div>
-          <div><label className="label">Orderly key</label><input className="input mono" placeholder="ed25519:…" value={orderlyKey} onChange={(e) => setOrderlyKey(e.target.value)} /></div>
-          <div><label className="label">Secret (hex)</label><input className="input mono" placeholder="64 hex chars" value={secretHex} onChange={(e) => setSecretHex(e.target.value)} type="password" /></div>
-          {error && <p style={{ color: "var(--red)", fontSize: 13 }}>{error}</p>}
-          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-            <button className="btn btn-solid" onClick={submit} disabled={busy}>{busy ? "Connecting…" : "Connect"}</button>
-            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          </div>
-        </div>
+    <div className="card" style={{ borderColor: "var(--gold-ring)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <span className="badge badge-gold" style={{ height: 22 }}>On-chain · Base</span>
+        <div style={{ fontWeight: 650 }}>{agent.name} — spot wallet</div>
       </div>
+      {!acct?.connected ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <p className="text-2" style={{ fontSize: 13 }}>Create this agent&apos;s trade-only on-chain wallet to trade tokens (Uniswap) on Base. It can swap but never withdraw to anyone but you.</p>
+          <button className="btn btn-solid btn-sm" onClick={provision} disabled={busy} style={{ alignSelf: "flex-start" }}>{busy ? "Creating…" : "Create on-chain wallet"}</button>
+        </div>
+      ) : (
+        <>
+          {acct.balances && (
+            <div className="grid-metrics" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 14 }}>
+              {[["ETH + USDC value (partial)", acct.coreValueUsd==null?"Unavailable":`$${acct.coreValueUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`], ["USDC", `$${(acct.balances.usdc ?? "Unavailable").toLocaleString()}`], ["ETH", String(acct.balances.eth ?? "Unavailable")]].map(([k, v]) => (
+                <div key={k}><div className="muted" style={{ fontSize: 11 }}>{k}</div><div style={{ fontWeight: 700, fontSize: 15 }}>{v}</div></div>
+              ))}
+            </div>
+          )}
+          <ConnectWallet toAddress={acct.evmAddress} />
+          <WithdrawPanel agentId={agent.id} acct={acct} onDone={load} />
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span className="muted" style={{ fontSize: 12 }}>Trades on Ethereum · Arbitrum · Optimism · Base · Hood Chain.</span>
+            <div style={{ flex: 1 }} />
+            <button className="btn btn-outline btn-sm" onClick={enableChains}>Enable all chains</button>
+            {chainMsg && <span style={{ fontSize: 12, color: chainMsg.includes("✓") ? "var(--green)" : "var(--text-2)" }}>{chainMsg}</span>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function WithdrawPanel({ agentId, acct, onDone }: { agentId: string; acct: any; onDone: () => void }) {
+  const [addr, setAddr] = useState(acct.ownerAddress ?? "");
+  const [asset, setAsset] = useState<"USDC" | "ETH">("USDC");
+  const [amount, setAmount] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const hasOwner = !!acct.ownerAddress;
+
+  async function setOwner() { setBusy(true); setMsg(null); try { const r = await api.turnkey.setOwner(agentId, addr.trim()); setMsg(r.ok ? "Withdrawal address set ✓" : (r.error || "Failed")); if (r.ok) onDone(); } catch (e) { setMsg(e instanceof Error ? e.message : "Failed"); } finally { setBusy(false); } }
+  async function withdraw() { setBusy(true); setMsg("Submitting…"); try { const r = await api.turnkey.withdraw(agentId, { asset, amount: Number(amount) }); setMsg(r.ok ? "Withdrawal sent ✓" : (r.error || "Failed")); if (r.ok) { setAmount(""); setTimeout(onDone, 3000); } } catch (e) { setMsg(e instanceof Error ? e.message : "Failed"); } finally { setBusy(false); } }
+
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+      <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8 }}>Withdraw</div>
+      {!hasOwner ? (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input className="input" style={{ flex: 1, minWidth: 180, height: 36 }} placeholder="Your wallet address (0x…) — funds only ever return here" value={addr} onChange={(e) => setAddr(e.target.value)} />
+          <button className="btn btn-solid btn-sm" onClick={setOwner} disabled={busy || !/^0x[0-9a-fA-F]{40}$/.test(addr.trim())}>Set address</button>
+        </div>
+      ) : (
+        <>
+          <div className="muted mono" style={{ fontSize: 12, marginBottom: 8 }}>To: {acct.ownerAddress.slice(0, 10)}…{acct.ownerAddress.slice(-6)} (your address, locked)</div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 4 }}>{(["USDC", "ETH"] as const).map((a) => <button key={a} onClick={() => setAsset(a)} className={`badge ${asset === a ? "badge-brand" : "badge-soft"}`} style={{ height: 32, cursor: "pointer", border: "none", padding: "0 12px" }}>{a}</button>)}</div>
+            <input className="input" style={{ flex: 1, minWidth: 110, height: 34 }} placeholder={`Amount ${asset}`} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <button className="btn btn-solid btn-sm" onClick={withdraw} disabled={busy || !(Number(amount) > 0)}>Withdraw</button>
+          </div>
+        </>
+      )}
+      {msg && <p style={{ fontSize: 12.5, marginTop: 8, color: msg.includes("✓") ? "var(--green)" : "var(--text-2)" }}>{msg}</p>}
     </div>
   );
 }

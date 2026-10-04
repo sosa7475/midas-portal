@@ -6,7 +6,7 @@ import { loadOrderly } from "../../../../lib/server/orderly-sql";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const s = getSession(req);
+  const s = await getSession(req);
   if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const agentId = req.nextUrl.searchParams.get("agentId");
   if (!agentId) return NextResponse.json({ error: "agentId required" }, { status: 400 });

@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "../../lib/api";
 
 export default function LoginPage() {
+  return <Suspense fallback={null}><LoginInner /></Suspense>;
+}
+
+function LoginInner() {
   const router = useRouter();
+  const nextUrl = useSearchParams().get("next");
   const [mode, setMode] = useState<"login" | "register">("register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,7 +24,8 @@ export default function LoginPage() {
     try {
       if (mode === "login") await api.auth.login(email, password);
       else await api.auth.register(email, password);
-      router.push("/overview");
+      if (nextUrl && nextUrl.startsWith("/")) window.location.href = nextUrl;
+      else router.push("/overview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -29,7 +35,7 @@ export default function LoginPage() {
 
   return (
     <main style={{ minHeight: "calc(100vh - 60px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <form className="card" style={{ width: 400, padding: 32 }} onSubmit={submit}>
+      <form className="card" style={{ width: 400, maxWidth: "100%", padding: "clamp(22px, 6vw, 32px)" }} onSubmit={submit}>
         <h1 style={{ fontSize: 24, marginBottom: 6 }}>{mode === "login" ? "Welcome back" : "Create your account"}</h1>
         <p className="text-2" style={{ marginBottom: 24, fontSize: 14 }}>
           {mode === "login" ? "Sign in to your agents" : "Start building trading agents in minutes"}
